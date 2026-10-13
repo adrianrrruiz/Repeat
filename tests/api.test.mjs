@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { blankHabit, dateKey } from '../lib/habits.ts';
+const base=process.env.REPEAT_TEST_URL||'http://127.0.0.1:8787';
+const a='qa-repeat-'+crypto.randomUUID(),b='qa-repeat-'+crypto.randomUUID();
+const headers=(user)=>({'oai-authenticated-user-id':user,'oai-authenticated-user-email':'qa@example.test'});
+const get=async(user)=>{const res=await fetch(base+'/api/state',{headers:headers(user)});assert.equal(res.status,200);return res.json();};
+const post=async(user,body,extra={})=>{const res=await fetch(base+'/api/state',{method:'POST',headers:{...headers(user),'Content-Type':'application/json',Origin:base,...extra},body:JSON.stringify({requestId:crypto.randomUUID(),...body})});const data=await res.json();return {status:res.status,data};};
+test('API: ocho hábitos, persistencia, concurrencia, reintentos y aislamiento',async()=>{
+ assert.equal((await fetch(base+'/api/state')).status,401);
+ const hs=Array.from({length:8},(_,i)=>({...blankHabit(i),name:'Prueba '+(i+1),goal:20}));
+ for(const h of hs){const r=await post(a,{op:'habit',habit:h});assert.equal(r.status,200,JSON.stringify(r.data));}
+ assert.equal((await get(a)).habits.length,8);
+ assert.equal((await get(b)).habits.length,0);
+ const denied=await post(b,{op:'entry',id:hs[0].id,date:dateKey(),mode:'set',value:100});assert.equal(denied.status,404);
+ const bad=await post(a,{op:'habit',habit:{...hs[0],name:''}});assert.equal(bad.status,400);
+ const csrf=await post(a,{op:'archive',id:hs[0].id,archived:true},{Origin:'https://other.example'});assert.equal(csrf.status,403);
+ const requestId=crypto.randomUUID(),inc={op:'entry',id:hs[0].id,date:dateKey(),mode:'increment',value:2,requestId};
+ assert.equal((await post(a,inc)).status,200);assert.equal((await post(a,inc)).status,200);
+ assert.equal((await get(a)).entries[0].value,2,'un reintento no duplica el registro');
+ const concurrency=await Promise.all(Array.from({length:5},()=>post(a,{op:'entry',id:hs[0].id,date:dateKey(),mode:'increment',value:1})));
+ assert.ok(concurrency.every(r=>r.status===200));assert.equal((await get(a)).entries[0].value,7,'incrementos concurrentes no se pierden');
+ const note=await post(a,{op:'entry',id:hs[0].id,date:dateKey(),mode:'note',note:'Nota de prueba',mood:5});assert.equal(note.status,200);
+ const reset=await post(a,{op:'entry',id:hs[0].id,date:dateKey(),mode:'clear'});assert.equal(reset.status,200);assert.equal(reset.data.entries[0].value,0);assert.equal(reset.data.entries[0].note,'Nota de prueba');
+ assert.equal((await post(a,{op:'archive',id:hs[0].id,archived:true})).data.habits[0].archived,true);
+ assert.equal((await post(a,{op:'archive',id:hs[0].id,archived:false})).data.habits[0].archived,false);
+ assert.equal((await post(a,{op:'mood',date:dateKey(),mood:4,note:'Prueba'})).data.moods[0].mood,4);
+ assert.equal((await get(b)).entries.length,0);
+ const latest=await get(a);assert.equal(latest.habits.length,8);assert.equal(latest.entries[0].note,'Nota de prueba');
+ console.log('Verificado: 8 hábitos; registros conservados; operaciones concurrentes; reintentos únicos; autorización y validación. Datos de prueba en usuarios QA locales.');
+});
