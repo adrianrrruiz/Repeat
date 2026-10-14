@@ -41,7 +41,6 @@ struct TodayView: View {
     @State private var catalog = false
     @State private var editing:Habit? = nil
     @State private var deleting:Habit? = nil
-    @State private var created:Habit? = nil
     @State private var showExcluded = false
     @State private var selected: Habit? = nil
     @State private var mood = false
@@ -54,7 +53,6 @@ struct TodayView: View {
         NavigationStack {
             List {
                 VStack(spacing:20) {
-                    if let created { HStack { VStack(alignment:.leading,spacing:5) { Label("Hábito guardado",systemImage:"checkmark.circle.fill").foregroundStyle(.green); Text("\(created.icon) \(created.name)").font(.caption); if !created.scheduled(date) { Text("No está programado para este día. Está disponible en Gestionar hábitos.").font(.caption2).foregroundStyle(.secondary) } }; Spacer(); Button("Ver") { selected = created }; Button { self.created = nil } label: { Image(systemName:"xmark") } }.padding().background(Color(.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:18)) }
                     HStack {
                         Button { date = Day.shift(date,-7) } label: { Image(systemName:"chevron.left") }
                         Spacer()
@@ -98,7 +96,7 @@ struct TodayView: View {
                 ToolbarItem(placement:.topBarLeading) { Menu { Button("Todos") { group = "" }; ForEach(store.groups,id:\.self) { g in Button(g) { group = g } } } label: { HStack { Text(group.isEmpty ? "Todos" : group); Image(systemName:"chevron.down").font(.system(size:9)) }.font(.caption).foregroundStyle(.white).padding(.horizontal,12).padding(.vertical,5).background(Color.repeatPink,in:Capsule()) } }
                 ToolbarItemGroup(placement:.topBarTrailing) { Button { mood = true } label: { Text("🙂") }; Button { catalog = true } label: { Image(systemName:"plus.circle.fill") } }
             }
-            .sheet(isPresented:$catalog) { HabitCatalog(onCreated:{ h in created = h }) }
+            .sheet(isPresented:$catalog) { HabitCatalog() }
             .sheet(item:$editing) { HabitEditor(initial:$0) }
             .confirmationDialog("Eliminar este hábito y sus registros",isPresented:Binding(get:{deleting != nil},set:{if !$0 { deleting = nil }}),titleVisibility:.visible) { Button("Eliminar definitivamente",role:.destructive) { if let deleting { store.delete(deleting) }; deleting = nil }; Button("Cancelar",role:.cancel) { deleting = nil } } message: { Text("Esta acción no se puede deshacer. Puedes archivar el hábito para conservar su historial.") }
             .sheet(item:$selected) { HabitDetail(original:$0,date:date) }
@@ -160,7 +158,7 @@ struct HabitDetail: View {
                         Text(correcting ? "Valor total del día" : "Añadir \(h.unit)").font(.caption).foregroundStyle(.secondary)
                         HStack { TextField("Cantidad",text:$amount).keyboardType(.decimalPad).padding(13).background(Color(.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:16)); Button(correcting ? "Guardar" : "Añadir") { log(h) }.buttonStyle(.borderedProminent).disabled(value == nil || value! < (correcting ? 0 : 0.000001)) }
                         Button(correcting ? "Volver a añadir" : "Corregir valor del día") { correcting.toggle(); amount = correcting ? String(store.entry(h,date)?.value ?? 0) : "1" }.font(.caption)
-                    } } else { Label("Apple Health · Solo en este iPhone",systemImage:"heart.fill").font(.footnote).foregroundStyle(.secondary); Button("Actualizar Salud") { Task { await store.refreshHealth(date:date) } }.disabled(store.readingHealth) }
+                    } } else { Label("Apple Health · Solo en este iPhone",systemImage:"heart.fill").font(.footnote).foregroundStyle(.secondary); Button("Actualizar Salud") { Task { do { if let source = store.healthSource(h.id) { try await store.health.request(source) }; await store.refreshHealth(date:date) } catch { store.error = error.localizedDescription } } }.disabled(store.readingHealth) }
                     Button { store.complete(h,date); if h.memoAfter { memo = true } } label: { Label(h.type == "quit" ? (p.done ? "Retirar confirmación" : "Confirmar dentro del límite") : p.done ? "Meta completada" : "Completar meta",systemImage:"checkmark").frame(maxWidth:.infinity).padding(11) }.buttonStyle(.borderedProminent).tint(h.tint).disabled(store.healthSource(h.id) != nil || (h.type == "build" ? p.done : !p.done && p.value > h.goal))
                     if let entry = store.entry(h,date),entry.value > 0 || entry.checked { Button("Restablecer progreso del día") { store.mutate(Operation(op:"entry",id:h.id,date:date,mode:"clear")) }.font(.caption2).foregroundStyle(.secondary).disabled(store.focus?.habitId == h.id || store.healthSource(h.id) != nil) }
                     if let e = store.entry(h,date),!e.note.isEmpty { Text(e.note).font(.subheadline).frame(maxWidth:.infinity,alignment:.leading).padding().background(Color(.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:18)) }

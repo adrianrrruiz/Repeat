@@ -21,7 +21,11 @@ struct EditorDraft:Codable,Equatable {
     func write(isNew:Bool,id:String) throws { try JSONEncoder().encode(self).write(to:Self.url(isNew:isNew,id:id),options:[.atomic,.completeFileProtectionUntilFirstUserAuthentication]) }
     static func newDrafts() -> [EditorDraft] {
         let files = (try? FileManager.default.contentsOfDirectory(at:URL.documentsDirectory,includingPropertiesForKeys:nil)) ?? []
-        return files.filter{$0.lastPathComponent.hasPrefix("repeat-new-habit-draft-")}.compactMap { url in guard let data = try? Data(contentsOf:url) else { return nil }; return try? JSONDecoder().decode(Self.self,from:data) }
+        return files.filter{$0.lastPathComponent.hasPrefix("repeat-new-habit-draft-")}.sorted { a,b in
+            let first = (try? a.resourceValues(forKeys:[.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let second = (try? b.resourceValues(forKeys:[.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return first > second
+        }.compactMap { url in guard let data = try? Data(contentsOf:url) else { return nil }; return try? JSONDecoder().decode(Self.self,from:data) }
     }
     static func clear(isNew:Bool,id:String) { try? FileManager.default.removeItem(at:url(isNew:isNew,id:id)) }
 }

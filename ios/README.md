@@ -15,7 +15,7 @@ Abre `Repeat.xcodeproj` en Xcode y selecciona el scheme Repeat. El proyecto util
 - Calendario, informes semanales/mensuales/anuales y cuadrícula anual.
 - Recordatorios nativos, con permiso solicitado al guardar avisos. Programa los siguientes avisos y renueva la programación al abrir la app; iOS limita la cantidad de avisos pendientes.
 - Catálogo por categorías y creación personalizada, siguiendo el flujo observado.
-- La creación solo cierra después de una escritura correcta. Si falla, muestra el error y conserva el formulario. Cada borrador se guarda por identificador y puede continuarse después de cerrar la app.
+- La creación solo cierra después de una escritura correcta. Si falla, muestra el error y conserva el formulario. Cada borrador se guarda por identificador. Al volver a Hábito personalizado se recupera el último pendiente sin avisos adicionales.
 - Derecha: completar; izquierda: añadir, saltar y ocultar. Saltar excluye el día de las rachas/informes; ocultar solo cambia la vista en este iPhone. Ambos se revierten desde «Saltados y ocultos».
 - Eliminar desde ⋯ en la ficha del hábito o el menú al mantener pulsada la tarjeta, con confirmación antes de quitar el hábito y sus registros.
 - Rachas actuales y mejores, gestión, ordenación, duplicación y eliminación de hábitos; cambio de nombre de grupos.
@@ -62,6 +62,8 @@ ios/build/model-tests
 ## Regresión de creación, versión 1.2
 
 - En el simulador se forzó un fallo real del destino de escritura: el formulario mostró el error, mantuvo todos los valores y no creó un hábito fantasma.
-- Tras reiniciar el proceso, «Continuar» recuperó nombre, descripción, grupo, meta decimal y unidad. Guardar después de restaurar el destino persistió esos campos y retiró el borrador.
+- Tras reiniciar el proceso, El borrador recuperó nombre, descripción, grupo, meta decimal y unidad. Guardar después de restaurar el destino persistió esos campos y retiró el borrador.
 - Un segundo borrador con icono, color, periodo personalizado, ciclo/días, franja, memo y fechas futuras pasó por Crear y se verificó campo por campo en disco.
 - Se comprobaron las acciones nativas Añadir, Saltar, Ocultar, Mostrar y el diálogo de eliminación en el simulador. El gesto físico de arrastre del control remoto en Simulator produjo un toque; queda por verificar el deslizamiento real en el iPhone actualizado.
+
+La versión 1.3 elimina la confirmación visual Hábito guardado y las filas Continuar. El botón Actualizar Salud también permite solicitar o revisar el permiso del tipo conectado.

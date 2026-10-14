@@ -32,11 +32,9 @@ struct HabitTemplate: Identifiable {
 struct HabitCatalog: View {
     @EnvironmentObject var store:HabitStore
     @Environment(\.dismiss) var dismiss
-    var onCreated:((Habit)->Void)? = nil
     @State private var didSave = false
     @State private var category = "Popular"
     @State private var search = ""
-    @State private var unfinished:[EditorDraft] = []
     @State private var draft:Habit? = nil
     @State private var suggestion:String? = nil
     private let categories = ["Popular","Salud","Deportes","Bienestar","Aprender","Rutina","Dejar hábitos"]
@@ -45,20 +43,17 @@ struct HabitCatalog: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing:18) {
-                    ForEach(unfinished,id:\.habit.id) { saved in Button { suggestion = nil; draft = saved.habit } label: { Label("Continuar: \(saved.habit.name.isEmpty ? "hábito sin nombre" : saved.habit.name)",systemImage:"square.and.pencil").frame(maxWidth:.infinity,alignment:.leading).padding().background(Color.repeatPink.opacity(0.1),in:RoundedRectangle(cornerRadius:18)) } }
 
                     ScrollView(.horizontal,showsIndicators:false) { HStack(spacing:10) { ForEach(categories,id:\.self) { c in Button { category = c } label: { HStack(spacing:6) { if c == "Salud" { Image(systemName:"heart.fill") }; Text(c) }.font(.subheadline).foregroundStyle(c == category ? Color.white : Color.primary).padding(.horizontal,20).padding(.vertical,10).background(c == category ? Color.repeatPink : Color(.secondarySystemGroupedBackground),in:Capsule()) } } } }.padding(.bottom,8)
-                    ForEach(templates) { template in Button { suggestion = template.health; let h = template.make(order:nextOrder); lastSavedID = h.id; draft = h } label: { HStack(spacing:15) { Text(template.icon).font(.system(size:29)); Text(template.name).font(.system(size:17)); Spacer(); if template.health != nil { Image(systemName:"heart.fill").font(.caption).foregroundStyle(Color.repeatPink) }; Image(systemName:"plus").font(.title3) }.padding(20).background(Color(.secondarySystemGroupedBackground),in:Capsule()) }.buttonStyle(.plain) }
+                    ForEach(templates) { template in Button { suggestion = template.health; let h = template.make(order:nextOrder); draft = h } label: { HStack(spacing:15) { Text(template.icon).font(.system(size:29)); Text(template.name).font(.system(size:17)); Spacer(); if template.health != nil { Image(systemName:"heart.fill").font(.caption).foregroundStyle(Color.repeatPink) }; Image(systemName:"plus").font(.title3) }.padding(20).background(Color(.secondarySystemGroupedBackground),in:Capsule()) }.buttonStyle(.plain) }
                     if templates.isEmpty { ContentUnavailableView.search(text:search) }
                 }.padding(22).padding(.bottom,70)
             }.background(Color(.systemGroupedBackground)).navigationTitle("Nuevo hábito").navigationBarTitleDisplayMode(.inline)
             .searchable(text:$search,prompt:"Buscar una idea")
-            .safeAreaInset(edge:.bottom) { Button { var h = Habit(); h.icon = "🌟"; h.color = "#3BD6BE"; h.order = nextOrder; h.memoAfter = true; suggestion = nil; lastSavedID = h.id; draft = h } label: { Text("Hábito personalizado").fontWeight(.semibold).padding(.horizontal,24).padding(.vertical,12) }.buttonStyle(.borderedProminent).clipShape(Capsule()).padding(.bottom,14) }
+            .safeAreaInset(edge:.bottom) { Button { var h = Habit(); h.icon = "🌟"; h.color = "#3BD6BE"; h.order = nextOrder; h.memoAfter = true; suggestion = nil; draft = EditorDraft.newDrafts().first(where:{ saved in !store.state.snapshot.habits.contains(where:{$0.id == saved.habit.id}) })?.habit ?? h } label: { Text("Hábito personalizado").fontWeight(.semibold).padding(.horizontal,24).padding(.vertical,12) }.buttonStyle(.borderedProminent).clipShape(Capsule()).padding(.bottom,14) }
             .toolbar { ToolbarItem(placement:.cancellationAction) { Button("Cerrar") { dismiss() } } }
-            .onAppear { unfinished = EditorDraft.newDrafts() }
-            .sheet(item:$draft,onDismiss:{ unfinished = EditorDraft.newDrafts(); if didSave { dismiss() } }) { habit in HabitEditor(initial:habit,suggestedHealth:suggestion,isNew:true,onSaved:{ h in didSave = true; onCreated?(h) }); }
+            .sheet(item:$draft,onDismiss:{ if didSave { dismiss() } }) { habit in HabitEditor(initial:habit,suggestedHealth:suggestion,isNew:true,onSaved:{ h in didSave = true }); }
         }
     }
-    @State private var lastSavedID:String? = nil
     var nextOrder:Int { (store.state.snapshot.habits.map(\.order).max() ?? -1)+1 }
 }
