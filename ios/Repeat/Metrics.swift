@@ -8,30 +8,27 @@ struct HabitMetrics {
     var streakUnit = "días"
 }
 func metrics(_ habit: Habit,_ entries: [Entry],today: String = Day.key(Date())) -> HabitMetrics {
-    var result = HabitMetrics()
-    let quota = habit.period == "day" && habit.frequency.hasSuffix("count")
-    result.streakUnit = quota ? (habit.frequency == "week-count" ? "semanas" : habit.frequency == "month-count" ? "meses" : "ciclos") : habit.period == "day" ? "días" : habit.period == "week" ? "semanas" : habit.period == "month" ? "meses" : "periodos"
+    var result = HabitMetrics(); let current = habit.at(today)
+    let quota = current.period == "day" && current.frequency.hasSuffix("count")
+    result.streakUnit = quota ? (current.frequency == "week-count" ? "semanas" : current.frequency == "month-count" ? "meses" : "ciclos") : current.period == "day" ? "días" : current.period == "week" ? "semanas" : current.period == "month" ? "meses" : "periodos"
     guard habit.startDate <= today else { return result }
     var blocks: [String:(done:Bool,end:String)] = [:]
-    var counts: [String:(days:Int,end:String)] = [:]
+    var counts: [String:(days:Int,target:Int,end:String)] = [:]
     var date = habit.startDate
     while date <= today {
         defer { date = Day.shift(date,1) }
         guard habit.scheduled(date),!entries.contains(where:{$0.habitId == habit.id && $0.date == date && $0.skipped == true}) else { continue }
-        let p = habit.progress(date,entries)
-        if p.done && habit.period == "day" { result.successes += 1; if date.hasPrefix(String(today.prefix(7))) { result.monthSuccesses += 1 } }
-        if quota {
-            var start: String; var end: String
-            if habit.frequency == "week-count" { start = Day.weekStart(date); end = Day.shift(start,6) }
-            else if habit.frequency == "month-count" { let interval = Calendar.current.dateInterval(of:.month,for:Day.date(date))!; start = Day.key(interval.start); end = Day.key(interval.end.addingTimeInterval(-1)) }
-            else { start = Day.shift(habit.startDate,(Day.distance(habit.startDate,date)/max(1,habit.cycleDays))*max(1,habit.cycleDays)); end = Day.shift(start,max(1,habit.cycleDays)-1) }
-            let old = counts[start] ?? (0,end); counts[start] = (old.days + (p.done ? 1 : 0),end)
+        let h = habit.at(date),p = habit.progress(date,entries)
+        if p.done && h.period == "day" { result.successes += 1; if date.hasPrefix(String(today.prefix(7))) { result.monthSuccesses += 1 } }
+        if h.period == "day" && h.frequency.hasSuffix("count") {
+            let (start,end) = habit.quotaBounds(date),old = counts[start] ?? (0,h.targetDays,end)
+            counts[start] = (old.days + (p.done ? 1 : 0),h.targetDays,end)
         } else {
             let (start,end) = habit.bounds(date)
-            if blocks[start] == nil { blocks[start] = (p.done,end); if p.done && habit.period != "day" { result.successes += 1; if date.hasPrefix(String(today.prefix(7))) { result.monthSuccesses += 1 } } }
+            if blocks[start] == nil { blocks[start] = (p.done,end); if p.done && h.period != "day" { result.successes += 1; if date.hasPrefix(String(today.prefix(7))) { result.monthSuccesses += 1 } } }
         }
     }
-    if quota { for (key,b) in counts { blocks[key] = (b.days >= habit.targetDays,b.end) } }
+    for (key,b) in counts { blocks[key] = (b.days >= b.target,b.end) }
     var run = 0
     for key in blocks.keys.sorted() { let block = blocks[key]!; if block.done { run += 1; result.best = max(result.best,run) } else if block.end < today { run = 0 } }
     result.current = run
@@ -39,18 +36,19 @@ func metrics(_ habit: Habit,_ entries: [Entry],today: String = Day.key(Date())) 
 }
 func rangeTotals(_ habits:[Habit],_ entries:[Entry],start:String,end:String) -> (Int,Int) {
     guard start <= end else { return (0,0) }; var total = 0,done = 0
-    for h in habits {
-        var slots: [String:Bool] = [:]; var quotas: [String:(Int,Int)] = [:]; var d = start
+    for habit in habits {
+        var slots: [String:Bool] = [:]; var quotas: [String:(days:Int,done:Int,target:Int)] = [:]; var d = start
         while d <= end {
-            if h.scheduled(d) && !entries.contains(where:{$0.habitId == h.id && $0.date == d && $0.skipped == true}) {
+            if habit.scheduled(d) && !entries.contains(where:{$0.habitId == habit.id && $0.date == d && $0.skipped == true}) {
+                let h = habit.at(d)
                 if h.period == "day" && h.frequency.hasSuffix("count") {
-                    let key = h.frequency == "week-count" ? Day.weekStart(d) : h.frequency == "month-count" ? String(d.prefix(7)) : String(Day.distance(h.startDate,d)/max(1,h.cycleDays))
-                    let b = quotas[key] ?? (0,0); quotas[key] = (b.0+1,b.1+(h.progress(d,entries).done ? 1 : 0))
-                } else { slots[h.bounds(d).0] = h.progress(d,entries).done }
+                    let key = habit.quotaBounds(d).0,b = quotas[key] ?? (0,0,h.targetDays)
+                    quotas[key] = (b.days+1,b.done+(habit.progress(d,entries).done ? 1 : 0),h.targetDays)
+                } else { slots[habit.bounds(d).0] = habit.progress(d,entries).done }
             }; d = Day.shift(d,1)
         }
         total += slots.count; done += slots.values.filter{$0}.count
-        for b in quotas.values { let target = min(b.0,h.targetDays); total += target; done += min(target,b.1) }
+        for b in quotas.values { let target = min(b.days,b.target); total += target; done += min(target,b.done) }
     }; return (total,done)
 }
 func limitedText(_ text:String,_ limit:Int) -> String {
@@ -68,6 +66,13 @@ func readBackup(_ data:Data) throws -> Snapshot {
     let ids = Set(snapshot.habits.map(\.id))
     guard ids.count == snapshot.habits.count else { throw BackupError.invalid("Hay hábitos duplicados en la copia.") }
     for h in snapshot.habits {
+        if let history = h.metricHistory {
+            guard history.count <= 1000,Set(history.map(\.effectiveDate)).count == history.count,history.allSatisfy({validDay($0.effectiveDate)}) else { throw BackupError.invalid("El historial de metas no es válido.") }
+            for revision in history {
+                var old = h.at(revision.effectiveDate); old.metricHistory = nil
+                _ = try readBackup(JSONEncoder().encode(Snapshot(habits:[old])))
+            }
+        }
         guard UUID(uuidString:h.id) != nil,!h.name.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty,h.name.utf16.count <= 100,h.icon.utf16.count <= 24,h.description.utf16.count <= 300,h.group.utf16.count <= 60,h.unit.utf16.count <= 30,h.goal.isFinite,h.goal >= 0,h.goal <= 1e9,(h.type == "quit" || h.goal > 0),["build","quit"].contains(h.type),["day","week","month","custom"].contains(h.period),["daily","weekdays","week-count","monthdays","month-count","cycle-days","cycle-count"].contains(h.frequency),(1...365).contains(h.periodDays),(1...365).contains(h.cycleDays),validDay(h.startDate),h.endDate == nil || (validDay(h.endDate!) && h.endDate! >= h.startDate),h.order >= 0,h.order <= 1000000,["any","morning","afternoon","evening"].contains(h.timeOfDay),h.color.range(of:"^#[0-9A-Fa-f]{6}$",options:.regularExpression) != nil else { throw BackupError.invalid("Un hábito contiene datos inválidos.") }
         let maximum = h.frequency == "weekdays" ? 7 : h.frequency == "monthdays" ? 31 : h.cycleDays
         let targetMaximum = h.frequency == "week-count" ? 7 : h.frequency == "month-count" ? 31 : h.cycleDays

@@ -24,34 +24,72 @@ struct Habit: Codable, Identifiable, Hashable {
     var endDate: String? = nil
     var archived = false
     var order = 0
+    var metricHistory: [MetricRevision]? = nil
+    var metric: HabitMetric { HabitMetric(type:type,goal:goal,unit:unit,period:period,periodDays:periodDays,frequency:frequency,days:days,targetDays:targetDays,cycleDays:cycleDays) }
+    func at(_ date:String) -> Habit {
+        guard let revision = metricHistory?.filter({$0.effectiveDate <= date}).max(by:{$0.effectiveDate < $1.effectiveDate}) else { return self }
+        var result = self; let m = revision.metric
+        result.type = m.type; result.goal = m.goal; result.unit = m.unit; result.period = m.period; result.periodDays = m.periodDays; result.frequency = m.frequency; result.days = m.days; result.targetDays = m.targetDays; result.cycleDays = m.cycleDays
+        return result
+    }
+    func preservingMetrics(from original:Habit,effectiveDate:String) -> Habit {
+        var result = self
+        result.metricHistory = original.metricHistory
+        guard metric != original.metric else { return result }
+        var history = original.metricHistory ?? [MetricRevision(effectiveDate:original.startDate,metric:original.metric)]
+        let effective = max(original.startDate,effectiveDate)
+        history.removeAll{$0.effectiveDate == effective}; history.append(MetricRevision(effectiveDate:effective,metric:metric))
+        result.metricHistory = history.sorted{$0.effectiveDate < $1.effectiveDate}
+        return result
+    }
+    func revisionBounds(_ date:String) -> (String,String) {
+        let revisions = (metricHistory ?? []).sorted{$0.effectiveDate < $1.effectiveDate}
+        return (revisions.last(where:{$0.effectiveDate <= date})?.effectiveDate ?? startDate,revisions.first(where:{$0.effectiveDate > date}).map{Day.shift($0.effectiveDate,-1)} ?? endDate ?? "2199-12-31")
+    }
     var tint: Color { Color(hex: color) }
     var isTimed: Bool { ["sec","min","hr"].contains(unit) }
     var periodLabel: String { ["day":"día","week":"semana","month":"mes"][period] ?? "\(periodDays) días" }
     var goalLabel: String { "\(number(goal)) \(unit) / \(periodLabel)" }
     func scheduled(_ date: String) -> Bool {
         guard date >= startDate, endDate == nil || date <= endDate! else { return false }
+        let h = at(date)
         let d = Day.date(date)
-        if frequency == "weekdays" { return days.contains((Calendar.current.component(.weekday, from: d) + 5) % 7 + 1) }
-        if frequency == "monthdays" { return days.contains(Calendar.current.component(.day, from: d)) }
-        if frequency == "cycle-days" { return days.contains(Day.distance(startDate,date) % max(1,cycleDays) + 1) }
+        if h.frequency == "weekdays" { return h.days.contains((Calendar.current.component(.weekday, from: d) + 5) % 7 + 1) }
+        if h.frequency == "monthdays" { return h.days.contains(Calendar.current.component(.day, from: d)) }
+        if h.frequency == "cycle-days" { return h.days.contains(Day.distance(startDate,date) % max(1,h.cycleDays) + 1) }
         return true
     }
     func bounds(_ date: String) -> (String,String) {
+        let h = at(date); var start = date,end = date
         let d = Day.date(date)
-        if period == "week" { let start = Day.weekStart(date); return (start,Day.shift(start,6)) }
-        if period == "month", let interval = Calendar.current.dateInterval(of: .month, for: d) { return (Day.key(interval.start),Day.key(interval.end.addingTimeInterval(-1))) }
-        if period == "custom" { let delta = Day.distance(startDate,date); let start = Day.shift(startDate,(delta / max(1,periodDays)) * max(1,periodDays)); return (start,Day.shift(start,max(1,periodDays)-1)) }
-        return (date,date)
+        if h.period == "week" { start = Day.weekStart(date); end = Day.shift(start,6) }
+        if h.period == "month",let interval = Calendar.current.dateInterval(of:.month,for:d) { start = Day.key(interval.start); end = Day.key(interval.end.addingTimeInterval(-1)) }
+        if h.period == "custom" { start = Day.shift(startDate,(Day.distance(startDate,date)/max(1,h.periodDays))*max(1,h.periodDays)); end = Day.shift(start,max(1,h.periodDays)-1) }
+        let revision = revisionBounds(date)
+        return (max(start,revision.0),min(end,revision.1))
     }
     func progress(_ date: String, _ entries: [Entry]) -> Progress {
+        let h = at(date)
         let (start,end) = bounds(date)
         let rows = entries.filter { $0.habitId == id && $0.date >= start && $0.date <= end && $0.date >= startDate && (endDate == nil || $0.date <= endDate!) }
         let value = rows.reduce(0) { $0 + $1.value }
         let checked = rows.contains { $0.checked }
-        let done = type == "quit" ? checked && value <= goal : value >= goal || checked
-        return Progress(value: value,done: done,ratio: done ? 1 : type == "quit" ? 0 : min(1,value / max(0.001,goal)))
+        let done = h.type == "quit" ? checked && value <= h.goal : value >= h.goal || checked
+        return Progress(value:value,done:done,ratio:done ? 1 : h.type == "quit" ? 0 : min(1,value/max(0.001,h.goal)))
+    }
+    func quotaBounds(_ date:String) -> (String,String) {
+        let h = at(date); var start:String,end:String
+        if h.frequency == "week-count" { start = Day.weekStart(date); end = Day.shift(start,6) }
+        else if h.frequency == "month-count" { let interval = Calendar.current.dateInterval(of:.month,for:Day.date(date))!; start = Day.key(interval.start); end = Day.key(interval.end.addingTimeInterval(-1)) }
+        else { start = Day.shift(startDate,(Day.distance(startDate,date)/max(1,h.cycleDays))*max(1,h.cycleDays)); end = Day.shift(start,max(1,h.cycleDays)-1) }
+        let revision = revisionBounds(date); return (max(start,revision.0),min(end,revision.1))
     }
 }
+struct HabitMetric: Codable,Hashable {
+    var type:String; var goal:Double; var unit:String; var period:String; var periodDays:Int
+    var frequency:String; var days:[Int]; var targetDays:Int; var cycleDays:Int
+}
+struct MetricRevision: Codable,Hashable { var effectiveDate:String; var metric:HabitMetric }
 struct Progress { var value: Double; var done: Bool; var ratio: Double }
 struct Entry: Codable, Identifiable {
     var habitId: String; var date: String; var value: Double = 0; var checked = false; var note = ""; var skipped:Bool? = nil; var mood: Int? = nil; var updatedAt = ISO8601DateFormatter().string(from: Date())
@@ -73,7 +111,7 @@ struct Operation: Codable, Identifiable {
     var archived: Bool? = nil
 }
 struct SavedState: Codable { var snapshot = Snapshot(); var queue: [Operation] = [] }
-struct FocusSession: Codable { var habitId: String; var date: String; var start: Date; var seconds: Double; var countdown: Bool; var requestId = UUID().uuidString.lowercased() }
+struct FocusSession: Codable { var habitId: String; var date: String; var start: Date; var seconds: Double; var countdown: Bool; var requestId = UUID().uuidString.lowercased(); var unit:String? = nil }
 
 enum Day {
     static func key(_ date: Date) -> String { let c = Calendar.current.dateComponents([.year,.month,.day], from: date); return String(format:"%04d-%02d-%02d",c.year!,c.month!,c.day!) }

@@ -21,3 +21,29 @@ test('saltar un día conserva racha y lo excluye del informe',()=>{
  assert.equal(streaks(h,skipped,'2026-10-14').current,3);
  assert.equal(rangeStats(h,skipped,'2026-10-10','2026-10-13').total,3);
 });
+
+test('subir metas de 20 a 30 y 40 conserva los registros antiguos',async()=>{
+ const {preserveMetricHistory,habitAt}=await import('../lib/habits.ts');
+ const original={...habit(),goal:20};const thirty=preserveMetricHistory({...original,goal:30},original,'2026-10-14');
+ const forty=preserveMetricHistory({...thirty,goal:40},thirty,'2026-10-21');
+ const records=[entry('2026-10-12',20,original.id)];
+ assert.equal(habitAt(forty,'2026-10-12').goal,20);assert.equal(habitAt(forty,'2026-10-14').goal,30);assert.equal(habitAt(forty,'2026-10-21').goal,40);
+ assert.equal(progress(forty,'2026-10-12',records).done,true);assert.equal(rangeStats(forty,records,'2026-10-12','2026-10-12').done,1);
+ assert.deepEqual(habitSchema.parse(forty).metricHistory,forty.metricHistory);
+});
+test('cambios de unidad y frecuencia no se aplican al pasado',async()=>{
+ const {preserveMetricHistory,habitAt}=await import('../lib/habits.ts');
+ const original=habit();const changed=preserveMetricHistory({...original,unit:'hr',goal:1,frequency:'weekdays',days:[1]},original,'2026-10-14');
+ assert.equal(habitAt(changed,'2026-10-13').unit,'min');assert.equal(scheduled(changed,'2026-10-13'),true);assert.equal(scheduled(changed,'2026-10-15'),false);
+ assert.equal(progress(changed,'2026-10-13',[entry('2026-10-13',30,original.id)]).done,true);
+});
+test('una semana no mezcla registros de minutos y horas entre versiones',async()=>{
+ const {preserveMetricHistory}=await import('../lib/habits.ts');const original={...habit(),goal:60,period:'week' as const};
+ const changed=preserveMetricHistory({...original,unit:'hr',goal:1},original,'2026-10-14');const records=[entry('2026-10-12',60,original.id),entry('2026-10-14',1,original.id)];
+ assert.equal(progress(changed,'2026-10-13',records).value,60);assert.equal(progress(changed,'2026-10-14',records).value,1);
+});
+test('editar el nombre conserva historial y rechaza metas históricas inválidas',async()=>{
+ const {preserveMetricHistory}=await import('../lib/habits.ts');const original=habit(),changed=preserveMetricHistory({...original,goal:40},original,'2026-10-14');
+ assert.deepEqual(preserveMetricHistory({...changed,name:'Leer más'},changed,'2026-10-15').metricHistory,changed.metricHistory);
+ assert.equal(habitSchema.safeParse({...changed,metricHistory:[{effectiveDate:'2026-10-01',metric:{...changed,goal:-1}}]}).success,false);
+});

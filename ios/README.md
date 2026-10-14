@@ -75,3 +75,15 @@ La versión 1.3 elimina la confirmación visual Hábito guardado y las filas Con
 - Meditación conectada a Salud permite corregir el tiempo registrado del día en Repeat. La corrección se guarda localmente, sobrevive a refrescar Salud y puede retirarse con Usar tiempo de Apple Health. No modifica muestras de HealthKit.
 - Verificado desde la interfaz del simulador: cambiar 2,5 a 4 minutos, persistencia de la corrección y lectura original intacta. Inspección de tarjetas al 0, 40, 60 y 100 %, navbar sin textos y ausencia del registro de ánimo.
 - Siete comprobaciones adicionales cubren correcciones, notas, refresco, restauración del valor original y compatibilidad de configuración.
+
+## Versión 1.5
+
+- Fichas a pantalla completa con fondo del hábito y controles inferiores. Cantidades: anillo, incrementos −/+, teclado y confirmación. Tiempo: reloj grande, cuenta atrás/cronómetro, estilo circular o cifras divididas y sonidos ambiente locales.
+- El teclado de registro convierte sec/min/hr a la unidad correspondiente a esa fecha, acepta decimales y guarda antes de cerrar. También acepta teclado externo.
+- Calendario del hábito, cuadrícula anual compacta y cuatro tarjetas de estadísticas. Tocar un día abre directamente su registro. Los identificadores del calendario son únicos para mostrar también la primera semana.
+- Sueño tiene ficha propia con duración, meta, gráfica y fases disponibles de HealthKit. Peso muestra gráfica, cambio desde el registro anterior, distancia a la meta y promedio de 30 días. No se calculan clasificaciones médicas ni IMC sin altura.
+- Las metas, unidades, tipo, periodo y frecuencia tienen versiones por fecha. Editar permite elegir Aplicar cambios de meta desde (hoy o una fecha futura); los registros, porcentajes e informes anteriores usan su configuración original. Una unidad nueva nunca se suma con la anterior dentro de un periodo que cruce el cambio.
+- Historial incluido en JSON, sincronización y widgets; CSV usa la unidad de cada fecha. Los temporizadores conservan la unidad con la que iniciaron y mantienen la sesión si falla guardar.
+- API conserva el historial al renombrar desde un cliente anterior y rechaza cambiar su métrica si ese cliente omite el historial.
+- 51 comprobaciones nativas y 14 pruebas del modelo web. Prueba de API local con sesión de desarrollo: guardar/releer historial, conservar un registro cumplido y compatibilidad con clientes anteriores (`node --test tests/history-api.test.mjs`, servidor local 5173).
+- QA de interfaz: añadir 3 minutos (10→13), incremento de cantidad, día anterior con 20/20 frente a meta actual 30, corregir meditación 2,5→4 y restaurar lectura original. Datos de prueba separados del iPhone del propietario.

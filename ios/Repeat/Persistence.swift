@@ -16,6 +16,7 @@ struct EditorDraft:Codable,Equatable {
     var healthEnabled:Bool
     var healthSourceID:String
     var superAlert:Bool
+    var metricEffectiveDate:String? = nil
     static func url(isNew:Bool,id:String) -> URL { URL.documentsDirectory.appending(path:isNew ? "repeat-new-habit-draft-\(id).json" : "repeat-edit-draft-\(id).json") }
     static func read(isNew:Bool,id:String) -> EditorDraft? { guard let data = try? Data(contentsOf:url(isNew:isNew,id:id)) else { return nil }; return try? JSONDecoder().decode(Self.self,from:data) }
     func write(isNew:Bool,id:String) throws { try JSONEncoder().encode(self).write(to:Self.url(isNew:isNew,id:id),options:[.atomic,.completeFileProtectionUntilFirstUserAuthentication]) }

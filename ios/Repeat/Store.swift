@@ -72,13 +72,16 @@ final class HabitStore: ObservableObject {
         if ["habit","archive","entry","delete"].contains(m.op) { Task { await scheduleReminders() } }
         if connected { Task { await sync() } } else { syncText = "Guardado en el iPhone" }; return true
     }
-    @discardableResult func storeHabit(_ h: Habit) -> Bool { mutate(Operation(op:"habit",habit:h)) }
+    @discardableResult func storeHabit(_ h:Habit,effectiveDate:String = Day.key(Date())) -> Bool {
+        let saved = state.snapshot.habits.first(where:{$0.id == h.id}).map{h.preservingMetrics(from:$0,effectiveDate:effectiveDate)} ?? h
+        return mutate(Operation(op:"habit",habit:saved))
+    }
     func entry(_ h: Habit,_ date: String) -> Entry? { entries.first { $0.habitId == h.id && $0.date == date } }
-    func add(_ h: Habit,_ date: String,_ amount: Double) { mutate(Operation(op:"entry",id:h.id,date:date,mode:"increment",value:amount)) }
-    func complete(_ h: Habit,_ date: String) {
-        let p = h.progress(date,entries)
-        if h.type == "quit" { mutate(Operation(op:"entry",id:h.id,date:date,mode:"check",checked:!p.done)) }
-        else { add(h,date,max(0,h.goal-p.value)) }
+    @discardableResult func add(_ h:Habit,_ date:String,_ amount:Double) -> Bool { mutate(Operation(op:"entry",id:h.id,date:date,mode:"increment",value:amount)) }
+    @discardableResult func complete(_ h:Habit,_ date:String) -> Bool {
+        let p = h.progress(date,entries),effective = h.at(date)
+        if effective.type == "quit" { return mutate(Operation(op:"entry",id:h.id,date:date,mode:"check",checked:!p.done)) }
+        return add(h,date,max(0,effective.goal-p.value))
     }
     func isSkipped(_ h:Habit,_ date:String) -> Bool { state.snapshot.entries.contains{$0.habitId == h.id && $0.date == date && $0.skipped == true} }
     func skip(_ h:Habit,_ date:String,_ skipped:Bool = true) { mutate(Operation(op:"entry",id:h.id,date:date,mode:"skip",checked:skipped)) }
@@ -119,20 +122,22 @@ final class HabitStore: ObservableObject {
         catch { syncText = "Guardado local · sin conexión" }
     }
     func startFocus(_ h: Habit,_ date: String,countdown: Bool) {
-        guard focus == nil else { return }; let seconds = max(1,(h.goal-h.progress(date,entries).value)*(h.unit == "hr" ? 3600 : h.unit == "min" ? 60 : 1))
-        focus = FocusSession(habitId:h.id,date:date,start:Date(),seconds:seconds,countdown:countdown)
+        guard focus == nil else { return }; let effective = h.at(date),seconds = max(1,(effective.goal-h.progress(date,entries).value)*(effective.unit == "hr" ? 3600 : effective.unit == "min" ? 60 : 1))
+        focus = FocusSession(habitId:h.id,date:date,start:Date(),seconds:seconds,countdown:countdown,unit:effective.unit)
         UserDefaults.standard.set(try? JSONEncoder().encode(focus),forKey:"repeat.focus")
         if let focus { FocusActivityController.start(focus,habit:h) }
+        FocusSounds.shared.start(habitID:h.id)
         if countdown { Task { let center = UNUserNotificationCenter.current(); let settings = await center.notificationSettings(); if settings.authorizationStatus == .notDetermined { _ = try? await center.requestAuthorization(options:[.alert,.sound,.badge]) }; guard let current = focus,current.habitId == h.id else { return }; let remaining = current.start.addingTimeInterval(current.seconds).timeIntervalSinceNow; guard remaining > 0 else { return }; let content = UNMutableNotificationContent(); content.title = "Temporizador terminado"; content.body = "\(h.icon) \(h.name)"; content.sound = .default; try? await center.add(UNNotificationRequest(identifier:"repeat-focus",content:content,trigger:UNTimeIntervalNotificationTrigger(timeInterval:max(1,remaining),repeats:false))) } }
     }
     func stopFocus() {
         guard !stopping, let f = focus, let h = state.snapshot.habits.first(where:{$0.id == f.habitId}) else { return }
         stopping = true
         let elapsed = min(max(0,Date().timeIntervalSince(f.start)),f.countdown ? f.seconds : 86400)
-        var op = Operation(op:"entry",id:h.id,date:f.date,mode:"increment",value:elapsed/(h.unit == "hr" ? 3600 : h.unit == "min" ? 60 : 1)); op.requestId = f.requestId
+        let unit = f.unit ?? h.at(f.date).unit
+        var op = Operation(op:"entry",id:h.id,date:f.date,mode:"increment",value:elapsed/(unit == "hr" ? 3600 : unit == "min" ? 60 : 1)); op.requestId = f.requestId
         // Persist progress and clear the timer before starting an asynchronous network request.
-        if !state.queue.contains(where:{$0.requestId == f.requestId}) { apply(op); state.queue.append(op); save() }
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers:["repeat-focus"]); focus = nil; UserDefaults.standard.removeObject(forKey:"repeat.focus"); FocusActivityController.stop(); stopping = false
+        if !state.queue.contains(where:{$0.requestId == f.requestId}),!mutate(op) { stopping = false; return }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers:["repeat-focus"]); focus = nil; UserDefaults.standard.removeObject(forKey:"repeat.focus"); FocusActivityController.stop(); FocusSounds.shared.stop(); stopping = false
         if connected { Task { await sync() } }
     }
     func publishWidget() {
@@ -206,7 +211,7 @@ final class HabitStore: ObservableObject {
         let today = Day.key(Date())
         for offset in 0..<30 { let date = Day.shift(today,offset); for h in active where h.scheduled(date) && !isSkipped(h,date) && (date != today || !h.progress(date,entries).done) { for time in h.reminders { let pieces = time.split(separator:":").compactMap { Int($0) }; if pieces.count == 2 { var c = Calendar.current.dateComponents([.year,.month,.day],from:Day.date(date)); c.hour = pieces[0]; c.minute = pieces[1]; if let at = Calendar.current.date(from:c),at > Date() { candidates.append((at,h,time)); if UserDefaults.standard.bool(forKey:"repeat.superAlert."+h.id) { for delay in [5,10,15] { let repeatAt = at.addingTimeInterval(Double(delay)*60); if Day.key(repeatAt) == date { candidates.append((repeatAt,h,time+"-\(delay)")) } } } } } } } }
         for (at,h,time) in candidates.sorted(by:{$0.0 < $1.0}).prefix(60) {
-            let content = UNMutableNotificationContent(); content.title = "\(h.icon) \(h.name)"; content.body = "Un pequeño paso para tu rutina. \(h.goalLabel)"; content.sound = .default
+            let content = UNMutableNotificationContent(); content.title = "\(h.icon) \(h.name)"; content.body = "Un pequeño paso para tu rutina. \(h.at(Day.key(at)).goalLabel)"; content.sound = .default
             let trigger = UNCalendarNotificationTrigger(dateMatching:Calendar.current.dateComponents([.year,.month,.day,.hour,.minute],from:at),repeats:false)
             try? await center.add(UNNotificationRequest(identifier:"repeat:\(h.id):\(Day.key(at)):\(time)",content:content,trigger:trigger))
         }

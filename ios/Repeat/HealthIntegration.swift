@@ -55,6 +55,28 @@ final class HealthIntegration {
             }; health.execute(query)
         }
     }
+    func sleepSummary(date:String) async throws -> SleepSummary? {
+        guard available,let type = HKObjectType.categoryType(forIdentifier:.sleepAnalysis) else { return nil }
+        let start = Calendar.current.startOfDay(for:Day.date(date)),end = Calendar.current.date(byAdding:.day,value:1,to:start)!
+        let samples:[HKCategorySample] = try await withCheckedThrowingContinuation { continuation in
+            health.execute(HKSampleQuery(sampleType:type,predicate:HKQuery.predicateForSamples(withStart:start,end:end,options:[]),limit:HKObjectQueryNoLimit,sortDescriptors:nil) { _,samples,error in
+                if let error { continuation.resume(throwing:error) } else { continuation.resume(returning:(samples as? [HKCategorySample]) ?? []) }
+            })
+        }
+        // Prefer the source with the most stage detail, avoiding duplicate tracks from multiple devices.
+        let groups = Dictionary(grouping:samples,by:{$0.sourceRevision.source.bundleIdentifier})
+        guard let selected = groups.values.max(by:{ a,b in
+            let detailedA = a.filter{$0.value >= HKCategoryValueSleepAnalysis.asleepCore.rawValue}.count
+            let detailedB = b.filter{$0.value >= HKCategoryValueSleepAnalysis.asleepCore.rawValue}.count
+            return detailedA == detailedB ? mergedSeconds(a.map{($0.startDate,$0.endDate)}) < mergedSeconds(b.map{($0.startDate,$0.endDate)}) : detailedA < detailedB
+        }) else { return nil }
+        let segments = selected.compactMap { sample -> SleepSegment? in
+            let stage:String
+            switch sample.value { case HKCategoryValueSleepAnalysis.awake.rawValue:stage = "awake"; case HKCategoryValueSleepAnalysis.asleepREM.rawValue:stage = "rem"; case HKCategoryValueSleepAnalysis.asleepCore.rawValue:stage = "core"; case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:stage = "deep"; case HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue:stage = "asleep"; default:return nil }
+            let a = max(start,sample.startDate),b = min(end,sample.endDate); return b > a ? SleepSegment(start:a,end:b,stage:stage) : nil
+        }.sorted{$0.start < $1.start}
+        return segments.isEmpty ? nil : SleepSummary(segments:segments)
+    }
 }
 func mergedSeconds(_ intervals:[(Date,Date)]) -> Double {
     let sorted = intervals.sorted{$0.0 < $1.0}; guard var current = sorted.first else { return 0 }; var seconds:Double = 0

@@ -2,11 +2,12 @@ import SwiftUI
 
 struct OverviewView: View {
     @EnvironmentObject var store: HabitStore
+    @Environment(\.dismiss) private var dismiss
     var habit: Habit? = nil
     @State private var month = Date()
     @State private var filter = ""
-    @State private var selected: Habit? = nil
     @State private var history:HistorySelection? = nil
+    @State private var recordDate:HistorySelection? = nil
     var habits: [Habit] { if let habit { return [habit] }; return filter.isEmpty ? store.active : store.active.filter{$0.id == filter} }
     var body: some View {
         NavigationStack {
@@ -14,14 +15,16 @@ struct OverviewView: View {
                 VStack(spacing:20) {
                     if habit == nil { ScrollView(.horizontal,showsIndicators:false) { HStack { Button("Todos") { filter = "" }; ForEach(store.active) { h in Button { filter = h.id } label: { Text(h.icon).font(.title2).padding(7).background(filter == h.id ? Color.repeatPink.opacity(0.1) : .clear,in:RoundedRectangle(cornerRadius:12)) } } } } }
                     calendar
+                    if habit != nil { yearGrid }
                     let stats = rangeTotals(habits,store.entries,start:Day.key(Calendar.current.dateInterval(of:.month,for:month)!.start),end:min(Day.key(Date()),Day.key(Calendar.current.dateInterval(of:.month,for:month)!.end.addingTimeInterval(-1))))
-                    VStack(spacing:15) { ZStack { ProgressRing(ratio:stats.0 > 0 ? Double(stats.1)/Double(stats.0) : 0,color:habit?.tint ?? .repeatPink,size:170); VStack { Text("\(stats.0 > 0 ? Int(Double(stats.1)/Double(stats.0)*100) : 0)%").font(.system(size:35,weight:.semibold)); Text("Cumplimiento del mes").font(.caption2).foregroundStyle(.secondary) } }; Text("\(stats.1) de \(stats.0) metas").font(.caption).foregroundStyle(.secondary) }.frame(maxWidth:.infinity).padding(27).background(.background,in:RoundedRectangle(cornerRadius:25))
+                    if habit == nil { VStack(spacing:15) { ZStack { ProgressRing(ratio:stats.0 > 0 ? Double(stats.1)/Double(stats.0) : 0,color:habit?.tint ?? .repeatPink,size:170); VStack { Text("\(stats.0 > 0 ? Int(Double(stats.1)/Double(stats.0)*100) : 0)%").font(.system(size:35,weight:.semibold)); Text("Cumplimiento del mes").font(.caption2).foregroundStyle(.secondary) } }; Text("\(stats.1) de \(stats.0) metas").font(.caption).foregroundStyle(.secondary) }.frame(maxWidth:.infinity).padding(27).background(.background,in:RoundedRectangle(cornerRadius:25)) }
                     let values = habits.map { metrics($0,store.entries) }
                     LazyVGrid(columns:[GridItem(.flexible()),GridItem(.flexible())],spacing:15) { metric("Metas del mes",stats.1,"calendar.badge.checkmark",.cyan); metric("Metas completadas",values.reduce(0){$0+$1.successes},"checkmark.circle",.mint); metric("Racha actual",values.map(\.current).max() ?? 0,"flame",.purple); metric("Mejor racha",values.map(\.best).max() ?? 0,"medal",.orange) }
-                    yearGrid
+                    if habit == nil { yearGrid }
                 }.padding(22)
             }.background(Color(.systemGroupedBackground)).navigationTitle(habit?.name ?? "Progreso").navigationBarTitleDisplayMode(.inline)
-            .sheet(item:$selected) { HabitDetail(original:$0,date:Day.key(month)) }
+            .toolbar { if habit != nil { ToolbarItem(placement:.cancellationAction) { Button { dismiss() } label:{Image(systemName:"xmark")}.keyboardShortcut(.escape,modifiers:[]).accessibilityLabel("Cerrar estadísticas") } } }
+            .sheet(item:$recordDate) { selection in if let habit { MetricPad(habit:habit,date:selection.date,mode:.set).presentationDetents([.height(470)]).presentationDragIndicator(.visible) } }
             .sheet(item:$history) { HistoryDayView(date:$0.date) }
         }
     }
@@ -32,7 +35,7 @@ struct OverviewView: View {
             HStack { Button { month = Calendar.current.date(byAdding:.month,value:-1,to:first)! } label: { Image(systemName:"chevron.left") }; Spacer(); Text(month.formatted(.dateTime.month(.wide).year())).font(.subheadline.weight(.semibold)); Spacer(); Button { month = Calendar.current.date(byAdding:.month,value:1,to:first)! } label: { Image(systemName:"chevron.right") } }.foregroundStyle(.secondary)
             LazyVGrid(columns:Array(repeating:GridItem(.flexible()),count:7),spacing:13) {
                 ForEach(Array(["L","M","X","J","V","S","D"].enumerated()),id:\.offset) { _,s in Text(s).font(.caption2) }
-                ForEach(0..<42,id:\.self) { n in let d = Day.shift(start,n); let p = store.percentage(d,habits); Button { if let habit { month = Day.date(d); selected = habit } else { history = HistorySelection(date:d) } } label: { ZStack { ProgressRing(ratio:p,color:habit?.tint ?? .repeatPink,size:33); Text("\(Calendar.current.component(.day,from:Day.date(d)))").font(.caption) }.opacity(d.hasPrefix(String(firstKey.prefix(7))) ? 1 : 0.25) }.buttonStyle(.plain).disabled(d > Day.key(Date())) }
+                ForEach((0..<42).map{Day.shift(start,$0)},id:\.self) { d in let p = store.percentage(d,habits); Button { if habit != nil { recordDate = HistorySelection(date:d) } else { history = HistorySelection(date:d) } } label: { ZStack { ProgressRing(ratio:p,color:habit?.tint ?? .repeatPink,size:33); Text("\(Calendar.current.component(.day,from:Day.date(d)))").font(.caption) }.opacity(d.hasPrefix(String(firstKey.prefix(7))) ? 1 : 0.25) }.buttonStyle(.plain).disabled(d > Day.key(Date())) }
             }
         }.padding(20).background(.background,in:RoundedRectangle(cornerRadius:25))
     }
@@ -40,7 +43,7 @@ struct OverviewView: View {
         let year = Calendar.current.component(.year,from:month); let start = String(format:"%04d-01-01",year)
         return VStack(alignment:.leading,spacing:16) {
             Text("Tu año, día a día").font(.subheadline.weight(.semibold))
-            LazyVGrid(columns:Array(repeating:GridItem(.flexible(),spacing:2),count:26),spacing:3) { ForEach(0..<Day.distance(start,String(format:"%04d-01-01",year+1)),id:\.self) { n in let d = Day.shift(start,n); let p = store.percentage(d,habits); RoundedRectangle(cornerRadius:1).fill(p > 0 ? (habit?.tint ?? .repeatPink).opacity(0.25+p*0.75) : Color(.systemGray6)).frame(height:8) } }
+            LazyVGrid(columns:Array(repeating:GridItem(.flexible(minimum:0),spacing:1),count:52),spacing:2) { ForEach(0..<Day.distance(start,String(format:"%04d-01-01",year+1)),id:\.self) { n in let d = Day.shift(start,n); let p = store.percentage(d,habits); RoundedRectangle(cornerRadius:1).fill(p > 0 ? (habit?.tint ?? .repeatPink).opacity(0.25+p*0.75) : Color(.systemGray6)).frame(height:5) } }
         }.padding(20).background(.background,in:RoundedRectangle(cornerRadius:25))
     }
     func metric(_ title:String,_ value:Int,_ symbol:String,_ color:Color) -> some View { VStack(alignment:.leading,spacing:16) { Image(systemName:symbol).foregroundStyle(color).font(.title2); Text("\(value)").font(.system(size:30,weight:.semibold)); Text(title).font(.caption).foregroundStyle(.secondary) }.frame(maxWidth:.infinity,alignment:.leading).padding(20).background(.background,in:RoundedRectangle(cornerRadius:22)) }
@@ -111,7 +114,7 @@ struct HistoryDayView: View {
     @Environment(\.dismiss) var dismiss
     var date:String
     @State private var selected:Habit? = nil
-    var body:some View { NavigationStack { ScrollView { VStack(spacing:15) { ForEach(store.active.filter{$0.scheduled(date)}) { h in HabitCard(habit:h,date:date,open:{selected = h},complete:{store.complete(h,date)}) } }.padding(22) }.navigationTitle(Day.date(date).formatted(.dateTime.day().month(.wide))).navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement:.cancellationAction) { Button("Cerrar") { dismiss() } } }.sheet(item:$selected) { HabitDetail(original:$0,date:date) } }
+    var body:some View { NavigationStack { ScrollView { VStack(spacing:15) { ForEach(store.active.filter{$0.scheduled(date)}) { h in HabitCard(habit:h,date:date,open:{selected = h},complete:{store.complete(h,date)}) } }.padding(22) }.navigationTitle(Day.date(date).formatted(.dateTime.day().month(.wide))).navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement:.cancellationAction) { Button("Cerrar") { dismiss() } } }.fullScreenCover(item:$selected) { HabitDetail(original:$0,date:date) } }
 }
 
 }

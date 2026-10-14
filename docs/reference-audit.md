@@ -20,3 +20,15 @@ El catálogo muestra categorías Popular, Health y Sports, filas con emoji, nomb
 Custom Habit abre nombre vacío, descripción, emoji, color menta, grupo, construir/dejar, Health apagado, periodo diario, 1 count/día, todos los días, franja Anytime, recordatorios apagados y memo tras completar encendido. Walk abre nombre e icono predefinidos, azul, Health encendido y 10000 pasos diarios. No se guardó ninguno. El desplazamiento remoto no permitió leer con fiabilidad toda la parte inferior.
 
 Repeat 1.1 reproduce ese catálogo y formulario con identidad y código propios. Integra Salud de solo lectura, widgets, Actividad en Vivo, bloqueo, rachas, gestión, restauración JSON y exportación CSV. El historial de Salud permanece en el teléfono y no se envía a Sites. Compartir, competir y grupos sociales quedan fuera del uso personal. La alerta reforzada repite avisos a los 5, 10 y 15 minutos; no se pudo observar el intervalo exacto de Super Alert. El medidor propietario de estrés no se ha reproducido.
+
+## Fichas interiores, 14 de octubre de 2026
+
+Inspección en vivo con iPhone Mirroring de lectura, Agradecer, sueño y peso. El propietario autorizó utilizar la aplicación anterior para pruebas. Se probó un incremento en lectura y Agradecer; no se eliminaron hábitos ni se cambiaron permisos.
+
+- Cantidades: fondo suave del color del hábito, círculo central con emoji, cantidad y meta; controles −/+; fila inferior de restablecer, Añadir y confirmar. Nota y estadísticas abajo; ⋯ para editar, archivar y eliminar.
+- Tiempo: círculo grande con tiempo restante, iniciar/pausar, restablecer y +; teclado propio de cuatro columnas con dígitos, borrar, decimal, confirmar y selector sec/min/hr. Estilo alternativo de cifras divididas y cambio entre cuenta atrás y cronómetro. Nota y estadísticas.
+- Estadísticas del hábito: calendario mensual, estado anual y cuatro tarjetas de éxitos/rachas. Tocar un día abre el registro numérico con su fecha, valor/meta y acciones de saltar/completar.
+- Sueño: anillo con duración/meta, resumen, gráfica temporal y fases disponibles; nota y estadísticas.
+- Peso: cifra grande, gráfica histórica, variación desde el registro previo, distancia a la meta y promedio reciente. Repeat utiliza los datos de peso ya autorizados; no solicita altura para calcular IMC.
+
+Repeat 1.5 reproduce esas distribuciones y flujos en SwiftUI. El sonido ambiente se genera localmente y las cifras divididas usan vistas propias. Las fases de sueño se leen exclusivamente en el iPhone y aparecen sin datos cuando la fuente no las registra.

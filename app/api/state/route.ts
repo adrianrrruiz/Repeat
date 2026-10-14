@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '../../chatgpt-auth';
-import { mutationSchema, type Habit } from '@/lib/habits';
+import { mutationSchema, metricOf, type Habit } from '@/lib/habits';
 export const dynamic='force-dynamic';
 const response=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 async function snapshot(userId:string){
@@ -20,13 +20,21 @@ export async function GET(){
 export async function POST(request:Request){
  const user=await getChatGPTUser();if(!user)return response({error:'Tu sesión terminó. Inicia sesión de nuevo.'},401);
  const origin=request.headers.get('origin');if(!origin||origin!==new URL(request.url).origin)return response({error:'Origen no permitido.'},403);
- if(Number(request.headers.get('content-length')||0)>20000)return response({error:'Solicitud demasiado grande.'},413);
- let body:unknown;try{const raw=await request.text();if(raw.length>20000)return response({error:'Solicitud demasiado grande.'},413);body=JSON.parse(raw);}catch{return response({error:'Solicitud inválida.'},400);}
+ if(Number(request.headers.get('content-length')||0)>512000)return response({error:'Solicitud demasiado grande.'},413);
+ let body:unknown;try{const raw=await request.text();if(raw.length>512000)return response({error:'Solicitud demasiado grande.'},413);body=JSON.parse(raw);}catch{return response({error:'Solicitud inválida.'},400);}
  const parsed=mutationSchema.safeParse(body);if(!parsed.success)return response({error:parsed.error.issues[0]?.message||'Revisa los datos.'},400);
  const m=parsed.data;const rid=z.string().uuid().safeParse(body && typeof body==='object' ? (body as {requestId?:unknown}).requestId : undefined);if(((m.op==='entry'&&m.mode==='increment')||m.op==='delete')&&!rid.success)return response({error:'Identificador de registro inválido.'},400);const db=env.DB; if(!db)return response({error:'La sincronización no está disponible.'},503);
  const uid=user.userId,now=new Date().toISOString();
  try{
-  if(m.op==='habit')await db.prepare('INSERT INTO habits(user_id,id,content,updated_at) VALUES(?,?,?,?) ON CONFLICT(user_id,id) DO UPDATE SET content=excluded.content,updated_at=excluded.updated_at').bind(uid,m.habit.id,JSON.stringify(m.habit),now).run();
+  if(m.op==='habit'){
+   const prior=await db.prepare('SELECT content FROM habits WHERE user_id=? AND id=?').bind(uid,m.habit.id).first<{content:string}>();
+   const previous=prior?JSON.parse(prior.content) as Habit:undefined;
+   if(previous?.metricHistory?.length&&!m.habit.metricHistory?.length){
+    if(JSON.stringify(metricOf(previous))!==JSON.stringify(metricOf(m.habit)))return response({error:'Actualiza Repeat para editar esta meta conservando su historial.'},409);
+    m.habit.metricHistory=previous.metricHistory;
+   }
+   await db.prepare('INSERT INTO habits(user_id,id,content,updated_at) VALUES(?,?,?,?) ON CONFLICT(user_id,id) DO UPDATE SET content=excluded.content,updated_at=excluded.updated_at').bind(uid,m.habit.id,JSON.stringify(m.habit),now).run();
+  }
   else if(m.op==='mood')await db.prepare('INSERT INTO moods(user_id,date,mood,note) VALUES(?,?,?,?) ON CONFLICT(user_id,date) DO UPDATE SET mood=excluded.mood,note=excluded.note').bind(uid,m.date,m.mood,m.note).run();
   else{
    if(m.op==='delete'&&rid.success){const receipt=await db.prepare('SELECT request_id FROM operation_receipts WHERE user_id=? AND request_id=?').bind(uid,rid.data).first();if(receipt)return response(await snapshot(uid));}

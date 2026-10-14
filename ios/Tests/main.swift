@@ -81,3 +81,36 @@ check(healthConfig.combinedEntries(manual:[note]).first?.value == 5,"Retirar cor
 let oldHealth = try JSONDecoder().decode(HealthConfiguration.self,from:Data("{\"sources\":{},\"entries\":[],\"showOnWidgets\":false}".utf8))
 check(oldHealth.corrections == nil,"Configuración anterior compatible")
 print("7 comprobaciones de corrección de meditación y progreso parcial: correctas")
+var reading = Habit(); reading.name = "Leer"; reading.startDate = "2026-10-01"; reading.goal = 20; reading.unit = "min"
+let pastReading = Entry(habitId:reading.id,date:"2026-10-12",value:20,note:"Nota anterior")
+var thirty = reading; thirty.goal = 30
+thirty = thirty.preservingMetrics(from:reading,effectiveDate:"2026-10-14")
+check(thirty.at("2026-10-12").goal == 20,"Conserva la meta antigua")
+check(thirty.at("2026-10-14").goal == 30,"Aplica nueva meta desde su fecha")
+check(thirty.progress("2026-10-12",[pastReading]).done,"Un registro completo pasado sigue completo")
+check(thirty.progress("2026-10-12",[pastReading]).ratio == reading.progress("2026-10-12",[pastReading]).ratio,"Mantiene el porcentaje pasado")
+var forty = thirty; forty.goal = 40; forty = forty.preservingMetrics(from:thirty,effectiveDate:"2026-10-21")
+check(forty.at("2026-10-20").goal == 30 && forty.at("2026-10-21").goal == 40,"Permite escalonar metas futuras")
+var named = forty; named.name = "Leer cada día"; named = named.preservingMetrics(from:forty,effectiveDate:"2026-10-15")
+check(named.metricHistory == forty.metricHistory,"Editar el nombre no altera las metas")
+var hours = forty; hours.unit = "hr"; hours.goal = 1; hours = hours.preservingMetrics(from:forty,effectiveDate:"2026-10-28")
+check(hours.at("2026-10-12").unit == "min" && hours.at("2026-10-28").unit == "hr","Cambiar unidad no reinterpreta minutos anteriores")
+let historyBackup = try readBackup(JSONEncoder().encode(Snapshot(habits:[hours],entries:[pastReading])))
+check(historyBackup.habits[0].metricHistory == hours.metricHistory && historyBackup.entries[0].note == pastReading.note,"La copia conserva metas y notas")
+var weekdays = hours; weekdays.frequency = "weekdays"; weekdays.days = [1]; weekdays = weekdays.preservingMetrics(from:hours,effectiveDate:"2026-11-01")
+check(weekdays.scheduled("2026-10-13") && !weekdays.scheduled("2026-11-03"),"La nueva frecuencia respeta los días anteriores")
+check(rangeTotals([thirty],[pastReading],start:"2026-10-12",end:"2026-10-12").1 == 1,"El informe mantiene la meta anterior cumplida")
+let historicalWidget = WidgetSnapshot(date:"2026-10-14",habits:[],completion:0,schedules:[forty],records:[WidgetRecord(habitId:reading.id,date:"2026-10-12",value:20,checked:false)]).forDay("2026-10-12")
+check(historicalWidget.habits[0].goal == 20 && historicalWidget.habits[0].done,"El widget usa la meta de la fecha")
+var sameDay = thirty; sameDay.goal = 35; sameDay = sameDay.preservingMetrics(from:thirty,effectiveDate:"2026-10-14")
+check(sameDay.metricHistory?.count == 2 && sameDay.at("2026-10-13").goal == 20,"Editar dos veces hoy preserva la base histórica")
+var weeklyBefore = reading; weeklyBefore.period = "week"; weeklyBefore.goal = 60
+var weeklyAfter = weeklyBefore; weeklyAfter.unit = "hr"; weeklyAfter.goal = 1; weeklyAfter = weeklyAfter.preservingMetrics(from:weeklyBefore,effectiveDate:"2026-10-14")
+let mixed = [Entry(habitId:reading.id,date:"2026-10-12",value:60),Entry(habitId:reading.id,date:"2026-10-14",value:1)]
+check(weeklyAfter.progress("2026-10-13",mixed).value == 60 && weeklyAfter.progress("2026-10-14",mixed).value == 1,"No suma unidades de versiones diferentes en la misma semana")
+let oldHabitData = try JSONEncoder().encode(reading)
+let oldHabitDecoded = try JSONDecoder().decode(Habit.self,from:oldHabitData)
+check(oldHabitDecoded.metricHistory == nil,"Los hábitos anteriores siguen siendo compatibles")
+var badHistory = thirty; badHistory.metricHistory![0].metric.goal = -1
+do { _ = try readBackup(JSONEncoder().encode(Snapshot(habits:[badHistory]))); fatalError("Aceptó una meta histórica inválida") } catch { }
+print("15 comprobaciones de metas por fecha, unidades, informes, widgets y copias: correctas")

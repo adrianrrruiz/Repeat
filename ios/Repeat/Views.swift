@@ -24,7 +24,7 @@ struct RootView: View {
         .overlay { if lockEnabled && !unlocked { AppLockCover(unlocked:$unlocked) } }
         .onChange(of:scenePhase) { _,phase in if phase != .active && lockEnabled { unlocked = false } }
         .onChange(of:lockEnabled) { _,enabled in if enabled { unlocked = false }; store.publishWidget() }
-        .sheet(item:$deepLinkHabit) { HabitDetail(original:$0,date:deepLinkDate) }
+        .fullScreenCover(item:$deepLinkHabit) { HabitDetail(original:$0,date:deepLinkDate) }
         .onOpenURL { url in guard url.scheme == "repeat" else { return }; tab = 0; let params = URLComponents(url:url,resolvingAgainstBaseURL:false)?.queryItems ?? []; if let id = params.first(where:{$0.name == "id"})?.value,let h = store.active.first(where:{$0.id == id}) { deepLinkDate = Day.key(Date()); deepLinkHabit = h } }
         .onReceive(tick) { _ in if store.connected { Task { await store.sync() } } }
         .alert("Repeat",isPresented:Binding(get:{store.error != nil},set:{if !$0 { store.error = nil }})) { Button("Aceptar") { store.error = nil } } message: { Text(store.error ?? "") }
@@ -98,7 +98,7 @@ struct TodayView: View {
             .sheet(isPresented:$catalog) { HabitCatalog() }
             .sheet(item:$editing) { HabitEditor(initial:$0) }
             .confirmationDialog("Eliminar este hábito y sus registros",isPresented:Binding(get:{deleting != nil},set:{if !$0 { deleting = nil }}),titleVisibility:.visible) { Button("Eliminar definitivamente",role:.destructive) { if let deleting { store.delete(deleting) }; deleting = nil }; Button("Cancelar",role:.cancel) { deleting = nil } } message: { Text("Esta acción no se puede deshacer. Puedes archivar el hábito para conservar su historial.") }
-            .sheet(item:$selected) { HabitDetail(original:$0,date:date) }
+            .fullScreenCover(item:$selected) { HabitDetail(original:$0,date:date) }
             .task(id:date) { await store.refreshHealth(date:date) }
             .safeAreaInset(edge:.bottom) { if let f = store.focus { FocusBanner(focus:f) } }
         }
@@ -127,72 +127,12 @@ struct HabitCard: View {
                     Text(habit.icon).font(.system(size:30))
                     VStack(alignment:.leading,spacing:3) { Text(habit.name).font(.system(size:17)); if !habit.description.isEmpty { Text(habit.description).font(.caption2).opacity(0.65) } }
                     Spacer(minLength:3)
-                    VStack(alignment:.trailing,spacing:4) { if showStreaks && streak.current > 0 { Text("🔥 \(streak.current) \(streak.streakUnit)").font(.system(size:9)).opacity(0.7) }; Text(store.healthSource(habit.id)?.id == "weight" ? "\(number(p.value)) kg" : "\(number(p.value))/\(number(habit.goal))\(habit.unit)").font(.system(size:15)).lineLimit(1).minimumScaleFactor(0.7) }
+                    VStack(alignment:.trailing,spacing:4) { if showStreaks && streak.current > 0 { Text("🔥 \(streak.current) \(streak.streakUnit)").font(.system(size:9)).opacity(0.7) }; Text(store.healthSource(habit.id)?.id == "weight" ? "\(number(p.value)) kg" : "\(number(p.value))/\(number(habit.at(date).goal))\(habit.at(date).unit)").font(.system(size:15)).lineLimit(1).minimumScaleFactor(0.7) }
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
             Button(action:p.done || store.healthSource(habit.id) != nil ? open : complete) { Image(systemName:p.done ? "checkmark" : "plus").font(.system(size:12)).frame(width:27,height:27).background(.white.opacity(p.done ? 0.3 : 0.7),in:Circle()) }.buttonStyle(.plain).accessibilityLabel(p.done ? "Ver registro de \(habit.name)" : "Completar \(habit.name)")
         }
     }
-}
-struct HabitDetail: View {
-    @EnvironmentObject var store: HabitStore
-    @Environment(\.dismiss) var dismiss
-    var original: Habit; var date: String
-    @State private var amount = "1"
-    @State private var correcting = false
-    @State private var editor = false
-    @State private var memo = false
-    @State private var stats = false
-    @State private var countdown = true
-    @State private var deleting = false
-    @State private var correctionError:String? = nil
-    var habit: Habit { store.state.snapshot.habits.first { $0.id == original.id } ?? original }
-    var body: some View {
-        let h = habit; let p = h.progress(date,store.entries)
-        NavigationStack {
-            ScrollView {
-                VStack(spacing:23) {
-                    HStack { Button { editor = true } label: { Label("Editar",systemImage:"pencil") }.disabled(store.focus?.habitId == h.id); Spacer(); Text(Day.date(date).formatted(.dateTime.day().month())).foregroundStyle(.secondary) }.font(.caption)
-                    ZStack {
-                        ProgressRing(ratio:p.ratio,color:h.tint,size:245)
-                        VStack(spacing:17) { Text(h.icon).font(.system(size:43)); Text(number(p.value)).font(.system(size:43,weight:.semibold)); Text("/\(number(h.goal)) \(h.unit)").font(.subheadline).foregroundStyle(.secondary); if p.done { Label("Meta lograda",systemImage:"checkmark").font(.caption).foregroundStyle(h.tint) } }
-                    }.padding(.vertical,30)
-                    if h.isTimed && store.healthSource(h.id) == nil {
-                        Picker("Temporizador",selection:$countdown) { Text("Cuenta atrás").tag(true); Text("Cronómetro").tag(false) }.pickerStyle(.segmented)
-                        if let f = store.focus, f.habitId == h.id { FocusBanner(focus:f) }
-                        else { Button { store.startFocus(h,date,countdown:countdown) } label: { Label(store.focus == nil ? "Iniciar enfoque" : "Otro temporizador activo",systemImage:"play.fill").frame(maxWidth:.infinity).padding(10) }.buttonStyle(.bordered).disabled(store.focus != nil || (countdown && p.done)) }
-                    }
-                    if store.healthSource(h.id) == nil { VStack(alignment:.leading,spacing:10) {
-                        Text(correcting ? "Valor total del día" : "Añadir \(h.unit)").font(.caption).foregroundStyle(.secondary)
-                        HStack { TextField("Cantidad",text:$amount).keyboardType(.decimalPad).padding(13).background(Color(.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:16)); Button(correcting ? "Guardar" : "Añadir") { log(h) }.buttonStyle(.borderedProminent).disabled(value == nil || value! < (correcting ? 0 : 0.000001)) }
-                        Button(correcting ? "Volver a añadir" : "Corregir valor del día") { correcting.toggle(); amount = correcting ? String(store.entry(h,date)?.value ?? 0) : "1" }.font(.caption)
-                    } } else { Label("Apple Health · Solo en este iPhone",systemImage:"heart.fill").font(.footnote).foregroundStyle(.secondary); Button("Actualizar Salud") { Task { do { if let source = store.healthSource(h.id) { try await store.health.request(source) }; await store.refreshHealth(date:date) } catch { store.error = error.localizedDescription } } }.disabled(store.readingHealth) }
-                    if store.healthSource(h.id)?.id == "mindful" {
-                        VStack(alignment:.leading,spacing:12) {
-                            if correcting {
-                                Text("Tiempo registrado del día (min)").font(.caption).foregroundStyle(.secondary)
-                                HStack { TextField("Minutos",text:$amount).keyboardType(.decimalPad).padding(13).background(Color(.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:16)); Button("Guardar") { log(h) }.buttonStyle(.borderedProminent).disabled(value == nil || value! < 0) }
-                            }
-                            Button(correcting ? "Cancelar corrección" : "Corregir tiempo registrado") { correcting.toggle(); amount = String(store.entry(h,date)?.value ?? 0) }
-                            if store.hasHealthCorrection(h,date) { Text("Tiempo corregido en Repeat").font(.caption).foregroundStyle(.secondary); Button("Usar tiempo de Apple Health") { if !store.correctHealth(h,date,value:nil) { correctionError = store.error; store.error = nil } } }
-                        }.font(.subheadline)
-                    }
-                    Button { store.complete(h,date); if h.memoAfter { memo = true } } label: { Label(h.type == "quit" ? (p.done ? "Retirar confirmación" : "Confirmar dentro del límite") : p.done ? "Meta completada" : "Completar meta",systemImage:"checkmark").frame(maxWidth:.infinity).padding(11) }.buttonStyle(.borderedProminent).tint(h.tint).disabled(store.healthSource(h.id) != nil || (h.type == "build" ? p.done : !p.done && p.value > h.goal))
-                    if let entry = store.entry(h,date),entry.value > 0 || entry.checked { Button("Restablecer progreso del día") { store.mutate(Operation(op:"entry",id:h.id,date:date,mode:"clear")) }.font(.caption2).foregroundStyle(.secondary).disabled(store.focus?.habitId == h.id || store.healthSource(h.id) != nil) }
-                    if let e = store.entry(h,date),!e.note.isEmpty { Text(e.note).font(.subheadline).frame(maxWidth:.infinity,alignment:.leading).padding().background(Color(.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:18)) }
-                    HStack { Button { memo = true } label: { Label("Nota",systemImage:"book.closed") }; Spacer(); Button { stats = true } label: { Label("Estadísticas",systemImage:"chart.bar") } }.font(.subheadline).padding(.top,15)
-                }.padding(25)
-            }.background(Color(.systemGroupedBackground)).navigationTitle("\(h.icon) \(h.name)").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement:.cancellationAction) { Button("Cerrar") { dismiss() } }; ToolbarItem(placement:.primaryAction) { Menu { Button("Editar",systemImage:"pencil") { editor = true }; Button("Eliminar hábito",systemImage:"trash",role:.destructive) { deleting = true } } label: { Image(systemName:"ellipsis") }.disabled(store.focus?.habitId == h.id) } }
-            .confirmationDialog("Eliminar \(h.name)",isPresented:$deleting,titleVisibility:.visible) { Button("Eliminar hábito y sus registros",role:.destructive) { if store.delete(h) { dismiss() } }; Button("Cancelar",role:.cancel) {} } message: { Text("Esta acción no se puede deshacer.") }
-            .alert("No se pudo guardar el tiempo",isPresented:Binding(get:{correctionError != nil},set:{if !$0 { correctionError = nil }})) { Button("Aceptar") {} } message: { Text(correctionError ?? "") }
-            .sheet(isPresented:$editor) { HabitEditor(initial:h) }
-            .sheet(isPresented:$memo) { MemoEditor(habit:h,date:date) }
-            .sheet(isPresented:$stats) { OverviewView(habit:h) }
-        }
-    }
-    var value: Double? { guard let v = Double(amount.replacingOccurrences(of:",",with:".")),v.isFinite,v <= 1e9 else { return nil }; return v }
-    func log(_ h: Habit) { guard let value else { return }; if store.healthSource(h.id)?.id == "mindful" { if store.correctHealth(h,date,value:value) { correcting = false } else { correctionError = store.error; store.error = nil }; return }; if correcting { store.mutate(Operation(op:"entry",id:h.id,date:date,mode:"set",value:value)) } else { store.add(h,date,value) }; if h.memoAfter && h.progress(date,store.entries).done { memo = true } }
 }
 struct FocusBanner: View {
     @EnvironmentObject var store: HabitStore
@@ -211,5 +151,5 @@ struct MemoEditor: View {
     var habit: Habit; var date: String
     @State private var note = ""
     @State private var mood: Int? = nil
-    var body: some View { NavigationStack { Form { Section(habit.name) { TextEditor(text:$note).frame(minHeight:180) } }.navigationTitle("Tu nota").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement:.cancellationAction) { Button("Cancelar") { dismiss() } }; ToolbarItem(placement:.confirmationAction) { Button("Guardar") { store.mutate(Operation(op:"entry",id:habit.id,date:date,mode:"note",note:limitedText(note,5000),mood:mood)); dismiss() } } }.onAppear { let e = store.entry(habit,date); note = e?.note ?? ""; mood = e?.mood } } }
+    var body: some View { NavigationStack { Form { Section(habit.name) { TextEditor(text:$note).frame(minHeight:180) } }.navigationTitle("Tu nota").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement:.cancellationAction) { Button("Cancelar") { dismiss() } }; ToolbarItem(placement:.confirmationAction) { Button("Guardar") { if store.mutate(Operation(op:"entry",id:habit.id,date:date,mode:"note",note:limitedText(note,5000),mood:mood)) { dismiss() } } } }.onAppear { let e = store.entry(habit,date); note = e?.note ?? ""; mood = e?.mood } } }
 }

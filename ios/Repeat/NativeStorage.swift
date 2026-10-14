@@ -11,7 +11,7 @@ struct WidgetSnapshot: Codable {
         guard let schedules,let records else { return key == date ? self : WidgetSnapshot(date:key,habits:[],completion:0) }
         let entries = records.map { Entry(habitId:$0.habitId,date:$0.date,value:$0.value,checked:$0.checked,skipped:$0.skipped) }
         let active = schedules.filter { h in !h.archived && h.scheduled(key) && !records.contains(where:{$0.habitId == h.id && $0.date == key && $0.skipped == true}) }
-        let summaries = active.map { h in let p = h.progress(key,entries); return WidgetHabit(id:h.id,name:h.name,icon:h.icon,color:h.color,value:p.value,goal:h.goal,unit:h.unit,done:p.done,automatic:automaticIDs?.contains(h.id) == true) }
+        let summaries = active.map { h in let p = h.progress(key,entries),effective = h.at(key); return WidgetHabit(id:h.id,name:h.name,icon:h.icon,color:h.color,value:p.value,goal:effective.goal,unit:effective.unit,done:p.done,automatic:automaticIDs?.contains(h.id) == true) }
         let ratio = active.isEmpty ? 0 : active.reduce(0) { $0 + $1.progress(key,entries).ratio } / Double(active.count)
         return WidgetSnapshot(date:key,habits:summaries,completion:ratio)
     }

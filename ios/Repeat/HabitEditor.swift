@@ -13,11 +13,12 @@ struct HabitEditor: View {
     @State private var authorizing = false
     @State private var initializedHealth = false
     @State private var superAlert = false
+    @State private var metricEffectiveDate = Day.key(Date())
     let suggestedHealth:String?
     let isNew:Bool
     let draftKey:String
     let onSaved:((Habit)->Void)?
-    var draftState:EditorDraft { EditorDraft(habit:draft,goalText:goalText,reminderTimes:reminderTimes,healthEnabled:healthEnabled,healthSourceID:healthSourceID,superAlert:superAlert) }
+    var draftState:EditorDraft { EditorDraft(habit:draft,goalText:goalText,reminderTimes:reminderTimes,healthEnabled:healthEnabled,healthSourceID:healthSourceID,superAlert:superAlert,metricEffectiveDate:metricEffectiveDate) }
     init(initial: Habit,suggestedHealth:String? = nil,isNew:Bool = false,onSaved:((Habit)->Void)? = nil) {
         self.isNew = isNew; self.draftKey = initial.id; self.onSaved = onSaved
         self.suggestedHealth = suggestedHealth
@@ -26,6 +27,7 @@ struct HabitEditor: View {
         _healthEnabled = State(initialValue:recovered?.healthEnabled ?? (suggestedHealth != nil)); _healthSourceID = State(initialValue:recovered?.healthSourceID ?? suggestedHealth ?? "steps")
         _superAlert = State(initialValue:recovered?.superAlert ?? UserDefaults.standard.bool(forKey:"repeat.superAlert."+initial.id))
         _initializedHealth = State(initialValue:recovered != nil)
+        _metricEffectiveDate = State(initialValue:max(Day.key(Date()),recovered?.metricEffectiveDate ?? Day.key(Date())))
         _reminderTimes = State(initialValue:recovered?.reminderTimes ?? initial.reminders.compactMap { value in let parts = value.split(separator:":").compactMap { Int($0) }; guard parts.count == 2 else { return nil }; return Calendar.current.date(bySettingHour:parts[0],minute:parts[1],second:0,of:Date()) })
     }
     let palette = ["#FF5B86","#5CBAF0","#3BD6BE","#8D71E1","#F4B357","#EC88B5","#7895E0","#8FC77D","#7D8796","#D4A37C","#76C8D0","#F4756A"]
@@ -52,6 +54,9 @@ struct HabitEditor: View {
                     NavigationLink { goalChooser } label: { HStack { Text("Valor de la meta"); Spacer(); Text("\(goalText) \(draft.unit)").foregroundStyle(.secondary) } }
                     NavigationLink { frequencyChooser } label: { HStack { Text("Días del hábito"); Spacer(); Text(frequencyNames.first{$0.0 == draft.frequency}?.1 ?? "Todos los días").font(.subheadline).foregroundStyle(.secondary) } }
                 } footer: { Text(draft.type == "quit" ? "Registra el consumo y confirma que no superaste tu límite." : "Completa tu meta en el periodo elegido.") }
+                if !isNew { Section {
+                    DatePicker("Aplicar cambios de meta desde",selection:Binding(get:{Day.date(metricEffectiveDate)},set:{metricEffectiveDate = Day.key($0)}),in:Calendar.current.startOfDay(for:Date())...,displayedComponents:.date)
+                } footer: { Text("La meta, unidad y frecuencia anteriores se conservan para las fechas pasadas.") } }
                 Section("Franja horaria") { Picker("Horario",selection:$draft.timeOfDay) { Text("Cualquiera").tag("any"); Text("Mañana").tag("morning"); Text("Tarde").tag("afternoon"); Text("Noche").tag("evening") }.pickerStyle(.segmented) }
                 Section {
                     Toggle("Recordatorios",isOn:Binding(get:{!reminderTimes.isEmpty},set:{ enabled in reminderTimes = enabled ? [Calendar.current.date(bySettingHour:9,minute:0,second:0,of:Date())!] : [] }))
@@ -117,7 +122,7 @@ struct HabitEditor: View {
     func preserveDraft() { do { try draftState.write(isNew:isNew,id:draftKey) } catch { validation = "No se pudo conservar el borrador: \(error.localizedDescription)" } }
     func commit() {
         preserveDraft()
-        guard store.storeHabit(draft) else { validation = store.error ?? "No se pudo guardar. Tu personalización sigue en este formulario."; store.error = nil; authorizing = false; return }
+        guard store.storeHabit(draft,effectiveDate:metricEffectiveDate) else { validation = store.error ?? "No se pudo guardar. Tu personalización sigue en este formulario."; store.error = nil; authorizing = false; return }
         UserDefaults.standard.set(superAlert,forKey:"repeat.superAlert."+draft.id); store.configureHealth(draft,source:healthEnabled ? healthSourceID : nil)
         if !draft.reminders.isEmpty { Task { let center = UNUserNotificationCenter.current(); let s = await center.notificationSettings(); if s.authorizationStatus == .notDetermined { _ = try? await center.requestAuthorization(options:[.alert,.sound,.badge]) }; await store.scheduleReminders() } }
         saved = true; EditorDraft.clear(isNew:isNew,id:draftKey); onSaved?(draft); dismiss()

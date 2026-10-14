@@ -50,7 +50,7 @@ struct BackupView: View {
     func exportCSV() {
         func cell(_ value:String) -> String { let safe = value.first.map{ "=+-@".contains($0) } == true ? "'"+value : value; return "\""+safe.replacingOccurrences(of:"\"",with:"\"\"")+"\"" }
         var rows = [["Fecha","Hábito","Valor","Unidad","Confirmado","Nota"]]
-        for e in store.state.snapshot.entries.sorted(by:{$0.date < $1.date}) { let h = store.state.snapshot.habits.first{$0.id == e.habitId}; rows.append([e.date,h?.name ?? "",String(e.value),h?.unit ?? "",e.checked ? "Sí" : "No",e.note]) }
+        for e in store.state.snapshot.entries.sorted(by:{$0.date < $1.date}) { let h = store.state.snapshot.habits.first{$0.id == e.habitId}; rows.append([e.date,h?.name ?? "",String(e.value),h?.at(e.date).unit ?? "",e.checked ? "Sí" : "No",e.note]) }
         let text = "\u{FEFF}"+rows.map{$0.map(cell).joined(separator:",")}.joined(separator:"\r\n")
         do { let url = URL.temporaryDirectory.appending(path:"repeat-registros-\(Day.key(Date())).csv"); try Data(text.utf8).write(to:url,options:.atomic); exported = url } catch { importError = error.localizedDescription }
     }
