@@ -13,3 +13,11 @@ test('validación rechaza fechas inválidas, cuota imposible y meta vacía',()=>
 
 test('una semana en curso no rompe una racha semanal anterior',()=>{const h={...habit(),startDate:'2026-10-05',period:'week' as const,goal:60};const es=[entry('2026-10-05',60,h.id)];assert.deepEqual(streaks(h,es,'2026-10-13'),{best:1,current:1});});
 test('frecuencia de tres días semanales mide rachas por semana',()=>{const h={...habit(),startDate:'2026-10-05',frequency:'week-count' as const,targetDays:3};const es=['2026-10-05','2026-10-07','2026-10-09','2026-10-12'].map(d=>entry(d,30,h.id));assert.deepEqual(streaks(h,es,'2026-10-13'),{best:1,current:1});});
+
+test('saltar un día conserva racha y lo excluye del informe',()=>{
+ const h={...blankHabit(0),startDate:'2026-10-10',goal:1};
+ const entries=['2026-10-10','2026-10-11','2026-10-12'].map(date=>({habitId:h.id,date,value:1,checked:false,note:'',mood:null,updatedAt:''}));
+ const skipped=[...entries,{habitId:h.id,date:'2026-10-13',value:0,checked:false,skipped:true,note:'',mood:null,updatedAt:''}];
+ assert.equal(streaks(h,skipped,'2026-10-14').current,3);
+ assert.equal(rangeStats(h,skipped,'2026-10-10','2026-10-13').total,3);
+});
