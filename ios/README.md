@@ -55,7 +55,7 @@ No es una distribución de App Store o TestFlight. La lectura real de Salud requ
 - Veintinueve comprobaciones de fechas, frecuencia, metas, límites y codificación/persistencia:
 
 ```sh
-xcrun swiftc ios/Repeat/Models.swift ios/Repeat/Metrics.swift ios/Repeat/Persistence.swift ios/tests/main.swift -o ios/build/model-tests
+xcrun swiftc ios/Repeat/Models.swift ios/Repeat/Metrics.swift ios/Repeat/Persistence.swift ios/Tests/main.swift -o ios/build/model-tests
 ios/build/model-tests
 ```
 
@@ -87,3 +87,17 @@ La versión 1.3 elimina la confirmación visual Hábito guardado y las filas Con
 - API conserva el historial al renombrar desde un cliente anterior y rechaza cambiar su métrica si ese cliente omite el historial.
 - 51 comprobaciones nativas y 14 pruebas del modelo web. Prueba de API local con sesión de desarrollo: guardar/releer historial, conservar un registro cumplido y compatibilidad con clientes anteriores (`node --test tests/history-api.test.mjs`, servidor local 5173).
 - QA de interfaz: añadir 3 minutos (10→13), incremento de cantidad, día anterior con 20/20 frente a meta actual 30, corregir meditación 2,5→4 y restaurar lectura original. Datos de prueba separados del iPhone del propietario.
+
+
+## Filtros de Hoy, versión 1.6 (build 7)
+
+El botón superior abre un panel como el observado en Habit: Estado (Todos, Pendientes, Completados) y Horario (Todos, Ahora, Cualquier hora, Mañana, Tarde, Noche). Cambiar estado mantiene el panel abierto; elegir horario lo cierra y actualiza la cápsula del encabezado. Los grupos siguen disponibles si existen. La selección se conserva localmente.
+
+- Build de Simulator y del iPhone: `BUILD SUCCEEDED`.
+- Pasaron las 63 comprobaciones nativas, con nuevas combinaciones de estado/horario, días programados y cumplimiento según metas históricas.
+- QA visual en Simulator: panel, cambio de estado sin cierre, resultados pendientes/completados, Mañana, Ahora, título del botón y cierre con Escape. El estado persistido y la cola permanecieron iguales tras filtrar.
+- Evidencia local: `outputs/repeat-filters-1-6.png` (datos ficticios, ignorada por Git).
+- Contexto, preferencias y reglas para siguientes agentes en `../AGENTS.md`.
+
+La versión 1.6 se instaló sobre la anterior sin desinstalar. La copia del estado y la cola tras instalar fue idéntica a la copia previa; se conservaron los nueve hábitos activos presentes en esa copia.
+La app actualizada se abrió y el panel de filtros se comprobó también mediante iPhone Mirroring en el dispositivo físico.

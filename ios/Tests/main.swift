@@ -114,3 +114,21 @@ check(oldHabitDecoded.metricHistory == nil,"Los hábitos anteriores siguen siend
 var badHistory = thirty; badHistory.metricHistory![0].metric.goal = -1
 do { _ = try readBackup(JSONEncoder().encode(Snapshot(habits:[badHistory]))); fatalError("Aceptó una meta histórica inválida") } catch { }
 print("15 comprobaciones de metas por fecha, unidades, informes, widgets y copias: correctas")
+var filterHabit = Habit(); filterHabit.name = "Filtro"; filterHabit.startDate = "2026-10-01"; filterHabit.goal = 20; filterHabit.unit = "min"
+let filterDate = "2026-10-14"
+let partialFilterEntries = [Entry(habitId:filterHabit.id,date:filterDate,value:10)]
+let completeFilterEntries = [Entry(habitId:filterHabit.id,date:filterDate,value:20)]
+check(HabitDayFilter().matches(filterHabit,date:filterDate,entries:partialFilterEntries,hour:15),"Todos incluye progreso parcial")
+check(HabitDayFilter(status:.unmet).matches(filterHabit,date:filterDate,entries:partialFilterEntries,hour:15),"Pendientes incluye metas incompletas")
+check(!HabitDayFilter(status:.met).matches(filterHabit,date:filterDate,entries:partialFilterEntries,hour:15),"Completados excluye progreso parcial")
+check(HabitDayFilter(status:.met).matches(filterHabit,date:filterDate,entries:completeFilterEntries,hour:15),"Completados usa el progreso real")
+check(!HabitDayFilter(status:.unmet).matches(filterHabit,date:filterDate,entries:completeFilterEntries,hour:15),"Pendientes excluye metas completadas")
+check(HabitDayFilter(time:.now).matches(filterHabit,date:filterDate,entries:[],hour:15),"Ahora incluye cualquier hora")
+filterHabit.timeOfDay = "morning"
+check(HabitDayFilter(time:.now).matches(filterHabit,date:filterDate,entries:[],hour:9),"Ahora incluye la franja actual")
+check(!HabitDayFilter(time:.now).matches(filterHabit,date:filterDate,entries:[],hour:15),"Ahora excluye otra franja")
+check(!HabitDayFilter(time:.any).matches(filterHabit,date:filterDate,entries:[],hour:9),"Cualquier hora no incluye mañana")
+check(HabitDayFilter(status:.met,time:.morning).matches(filterHabit,date:filterDate,entries:completeFilterEntries,hour:15),"Combina estado y franja sin depender del reloj")
+check(!HabitDayFilter().matches(filterHabit,date:"2026-09-30",entries:[],hour:15),"Filtrar no muestra hábitos anteriores a su inicio")
+check(HabitDayFilter(status:.met).matches(thirty,date:"2026-10-12",entries:[pastReading],hour:15),"El filtro respeta la meta histórica")
+print("12 comprobaciones de filtros combinados, horario y metas históricas: correctas")

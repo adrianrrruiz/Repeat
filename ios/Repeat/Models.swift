@@ -90,6 +90,24 @@ struct HabitMetric: Codable,Hashable {
     var frequency:String; var days:[Int]; var targetDays:Int; var cycleDays:Int
 }
 struct MetricRevision: Codable,Hashable { var effectiveDate:String; var metric:HabitMetric }
+enum HabitStatusFilter:String,CaseIterable { case all,unmet,met
+    var title:String { switch self { case .all:return "Todos"; case .unmet:return "Pendientes"; case .met:return "Completados" } }
+}
+enum HabitTimeFilter:String,CaseIterable { case all,now,any,morning,afternoon,evening
+    var title:String { switch self { case .all:return "Todos"; case .now:return "Ahora"; case .any:return "Cualquier hora"; case .morning:return "Mañana"; case .afternoon:return "Tarde"; case .evening:return "Noche" } }
+}
+struct HabitDayFilter {
+    var status:HabitStatusFilter = .all
+    var time:HabitTimeFilter = .all
+    func matches(_ habit:Habit,date:String,entries:[Entry],hour:Int) -> Bool {
+        guard habit.scheduled(date) else { return false }
+        let done = habit.progress(date,entries).done
+        if status == .met && !done || status == .unmet && done { return false }
+        if time == .all { return true }
+        if time == .now { let current = (6..<12).contains(hour) ? "morning" : (12..<18).contains(hour) ? "afternoon" : "evening"; return habit.timeOfDay == "any" || habit.timeOfDay == current }
+        return habit.timeOfDay == time.rawValue
+    }
+}
 struct Progress { var value: Double; var done: Bool; var ratio: Double }
 struct Entry: Codable, Identifiable {
     var habitId: String; var date: String; var value: Double = 0; var checked = false; var note = ""; var skipped:Bool? = nil; var mood: Int? = nil; var updatedAt = ISO8601DateFormatter().string(from: Date())

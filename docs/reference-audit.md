@@ -2,7 +2,7 @@
 
 Inspección mediante Computer / iPhone Mirroring el 13 de octubre de 2026. No se guardaron cambios ni se compró una suscripción.
 
-- Hoy: filtro de grupos, anillos de progreso semanales, tarjetas pastel antes de completar y color sólido después. Icono, nombre, descripción opcional, valor/meta, racha. Barra inferior flotante.
+- Hoy (primera inspección, corregida abajo): filtro superior, anillos de progreso semanales, tarjetas pastel antes de completar y color sólido después. Icono, nombre, descripción opcional, valor/meta, racha. Barra inferior flotante.
 - Registrar: círculo central con icono, valor/meta, incremento, confirmar, memo y estadísticas. Unidades temporales habilitan temporizador.
 - Formulario observado en Editar: icono, nombre, descripción, color, grupo, construir/dejar, Apple Health, periodo diario/semanal/mensual/personalizado, valor/unidad, frecuencia, franja horaria, recordatorios y memo tras completar.
 - Unidades: cantidad (sin unidad, count, steps, m, km, mile, ml, oz, Cal, g, mg, drink, personalizada); tiempo (sec, min, hr).
@@ -32,3 +32,16 @@ Inspección en vivo con iPhone Mirroring de lectura, Agradecer, sueño y peso. E
 - Peso: cifra grande, gráfica histórica, variación desde el registro previo, distancia a la meta y promedio reciente. Repeat utiliza los datos de peso ya autorizados; no solicita altura para calcular IMC.
 
 Repeat 1.5 reproduce esas distribuciones y flujos en SwiftUI. El sonido ambiente se genera localmente y las cifras divididas usan vistas propias. Las fases de sueño se leen exclusivamente en el iPhone y aparecen sin datos cuando la fuente no las registra.
+
+
+## Filtros superiores, 14 de octubre de 2026
+
+Inspección directa del panel de Habit mediante iPhone Mirroring, sin crear ni borrar hábitos. Corrige la interpretación inicial de que el botón superior solo filtraba grupos.
+
+- Cápsula rosa compacta All con chevron; sin cápsula exterior blanca. Panel desde arriba, fondo muy claro, esquinas inferiores redondeadas y resto de la pantalla atenuado, incluida la barra inferior.
+- Status: All, Unmet, Met en un control segmentado. Cambiar estado deja abierto el panel y filtra inmediatamente. El botón superior no adopta el nombre del estado.
+- Time: All, Now, Anytime, Morning, Afternoon, Evening en chips que saltan de línea. Elegir horario cierra el panel y cambia el título del botón superior. Tocar fuera cierra también.
+- Now observado por la tarde incluye hábitos Anytime y de esa franja; excluye los de Evening. Morning no incluye los hábitos Anytime.
+- En ambas aplicaciones no había grupos activos; el original mostró solo esas dos filas. Repeat conserva los grupos existentes mediante una fila adicional cuando los haya.
+
+Repeat 1.6 implementa estas opciones en español. «Ahora» usa hora local: mañana de 06:00 a 11:59, tarde de 12:00 a 17:59 y noche el resto; esos límites exactos no se pudieron observar en la referencia. El estado se obtiene del progreso de la fecha seleccionada y sus metas históricas. Los filtros son preferencias locales; no escriben en el historial ni en la cola de sincronización.

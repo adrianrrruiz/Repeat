@@ -4,6 +4,9 @@ struct RootView: View {
     @EnvironmentObject var store: HabitStore
     @State private var tab = 0
     @State private var group = ""
+    @State private var filtersShown = false
+    @AppStorage("repeat.filter.status") private var filterStatus = "all"
+    @AppStorage("repeat.filter.time") private var filterTime = "all"
     @AppStorage("repeat.theme") private var theme = "system"
     @AppStorage("repeat.lockEnabled") private var lockEnabled = false
     @Environment(\.scenePhase) private var scenePhase
@@ -13,16 +16,19 @@ struct RootView: View {
     private let tick = Timer.publish(every:15,on:.main,in:.common).autoconnect()
     var body: some View {
         TabView(selection:$tab) {
-            TodayView(group:$group).tabItem { Image(systemName:"house.fill").accessibilityLabel("Hoy") }.tag(0)
+            TodayView(group:$group,status:$filterStatus,time:$filterTime,openFilters:{ withAnimation(.easeOut(duration:0.2)) { filtersShown = true } }).tabItem { Image(systemName:"house.fill").accessibilityLabel("Hoy") }.tag(0)
             OverviewView().tabItem { Image(systemName:"chart.bar.fill").accessibilityLabel("Progreso") }.tag(1)
             GroupsView { selected in group = selected; tab = 0 }.tabItem { Image(systemName:"folder.fill").accessibilityLabel("Grupos") }.tag(2)
             ReportsView().tabItem { Image(systemName:"list.bullet.clipboard.fill").accessibilityLabel("Informes") }.tag(3)
             SettingsView().tabItem { Image(systemName:"gearshape.fill").accessibilityLabel("Mi espacio") }.tag(4)
         }
         .preferredColorScheme(theme == "dark" ? .dark : theme == "light" ? .light : nil)
-        .accessibilityHidden(lockEnabled && !unlocked)
+        .accessibilityHidden(lockEnabled && !unlocked || filtersShown)
+        .overlay(alignment:.top) { if filtersShown { TodayFilterPanel(status:$filterStatus,time:$filterTime,group:$group,groups:store.groups,close:{ withAnimation(.easeOut(duration:0.2)) { filtersShown = false } }) } }
         .overlay { if lockEnabled && !unlocked { AppLockCover(unlocked:$unlocked) } }
-        .onChange(of:scenePhase) { _,phase in if phase != .active && lockEnabled { unlocked = false } }
+        .onChange(of:scenePhase) { _,phase in if phase != .active { filtersShown = false; if lockEnabled { unlocked = false } } }
+        .onChange(of:tab) { _,_ in filtersShown = false }
+        .onChange(of:store.groups) { _,groups in if !group.isEmpty && !groups.contains(group) { group = "" } }
         .onChange(of:lockEnabled) { _,enabled in if enabled { unlocked = false }; store.publishWidget() }
         .fullScreenCover(item:$deepLinkHabit) { HabitDetail(original:$0,date:deepLinkDate) }
         .onOpenURL { url in guard url.scheme == "repeat" else { return }; tab = 0; let params = URLComponents(url:url,resolvingAgainstBaseURL:false)?.queryItems ?? []; if let id = params.first(where:{$0.name == "id"})?.value,let h = store.active.first(where:{$0.id == id}) { deepLinkDate = Day.key(Date()); deepLinkHabit = h } }
@@ -37,6 +43,12 @@ struct ProgressRing: View {
 struct TodayView: View {
     @EnvironmentObject var store: HabitStore
     @Binding var group: String
+    @Binding var status:String
+    @Binding var time:String
+    var openFilters:()->Void
+    @State private var now = Date()
+    private let filterClock = Timer.publish(every:60,on:.main,in:.common).autoconnect()
+    var dayFilter:HabitDayFilter { HabitDayFilter(status:HabitStatusFilter(rawValue:status) ?? .all,time:HabitTimeFilter(rawValue:time) ?? .all) }
     @State private var date = Day.key(Date())
     @State private var catalog = false
     @State private var editing:Habit? = nil
@@ -46,10 +58,12 @@ struct TodayView: View {
     @AppStorage("repeat.weekMode") private var weekMode = "week"
     @AppStorage("repeat.showStreaks") private var showStreaks = true
     var scheduled:[Habit] { store.active.filter { (group.isEmpty || $0.group == group) && $0.scheduled(date) } }
-    var habits:[Habit] { scheduled.filter{!store.isHidden($0,date) && !store.isSkipped($0,date)} }
+    var habits:[Habit] { scheduled.filter{!store.isHidden($0,date) && !store.isSkipped($0,date) && dayFilter.matches($0,date:date,entries:store.entries,hour:Calendar.current.component(.hour,from:now))} }
     var excluded:[Habit] { scheduled.filter{store.isHidden($0,date) || store.isSkipped($0,date)} }
     var body: some View {
         NavigationStack {
+            VStack(spacing:0) {
+                header
             List {
                 VStack(spacing:20) {
                     HStack {
@@ -80,8 +94,8 @@ struct TodayView: View {
                         VStack(spacing:18) {
                             Text("🌱").font(.system(size:68)).frame(width:155,height:155).background(Color.repeatPink.opacity(0.07),in:Circle())
                             Text(store.active.isEmpty ? "Un pequeño paso.\nCada día." : "Hoy, a tu ritmo.").font(.system(size:30,weight:.semibold)).multilineTextAlignment(.center)
-                            Text(store.active.isEmpty ? "Crea todos los hábitos que quieras.\nEste espacio es solo para ti." : "No hay hábitos programados\npara este día y grupo.").font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                            Button { catalog = true } label: { Label("Crear un hábito",systemImage:"plus").padding(.horizontal,20).padding(.vertical,11) }.buttonStyle(.borderedProminent).clipShape(Capsule())
+                            Text(store.active.isEmpty ? "Crea todos los hábitos que quieras.\nEste espacio es solo para ti." : status != "all" || time != "all" || !group.isEmpty ? "No hay hábitos que coincidan\ncon estos filtros." : "No hay hábitos programados\npara este día.").font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                            if !store.active.isEmpty && (status != "all" || time != "all" || !group.isEmpty) { Button("Ver todos") { status = "all"; time = "all"; group = "" }.buttonStyle(.borderedProminent).clipShape(Capsule()) } else { Button { catalog = true } label: { Label("Crear un hábito",systemImage:"plus").padding(.horizontal,20).padding(.vertical,11) }.buttonStyle(.borderedProminent).clipShape(Capsule()) }
                         }.frame(maxWidth:.infinity).padding(.top,35)
                     } else {
                         VStack(spacing:9) {
@@ -90,11 +104,9 @@ struct TodayView: View {
                         }.padding(.top,7)
                     }
                 }.listRowInsets(EdgeInsets(top:0,leading:23,bottom:23,trailing:23)).listRowSeparator(.hidden).listRowBackground(Color.clear)
-            }.listStyle(.plain).scrollContentBackground(.hidden).navigationTitle("Hoy").navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement:.topBarLeading) { Menu { Button("Todos") { group = "" }; ForEach(store.groups,id:\.self) { g in Button(g) { group = g } } } label: { HStack { Text(group.isEmpty ? "Todos" : group); Image(systemName:"chevron.down").font(.system(size:9)) }.font(.caption).foregroundStyle(.white).padding(.horizontal,12).padding(.vertical,5).background(Color.repeatPink,in:Capsule()) } }
-                ToolbarItemGroup(placement:.topBarTrailing) { Button { catalog = true } label: { Image(systemName:"plus.circle.fill") } }
-            }
+            }.listStyle(.plain).scrollContentBackground(.hidden)
+            }.toolbar(.hidden,for:.navigationBar)
+            .onReceive(filterClock) { now = $0 }
             .sheet(isPresented:$catalog) { HabitCatalog() }
             .sheet(item:$editing) { HabitEditor(initial:$0) }
             .confirmationDialog("Eliminar este hábito y sus registros",isPresented:Binding(get:{deleting != nil},set:{if !$0 { deleting = nil }}),titleVisibility:.visible) { Button("Eliminar definitivamente",role:.destructive) { if let deleting { store.delete(deleting) }; deleting = nil }; Button("Cancelar",role:.cancel) { deleting = nil } } message: { Text("Esta acción no se puede deshacer. Puedes archivar el hábito para conservar su historial.") }
@@ -102,6 +114,16 @@ struct TodayView: View {
             .task(id:date) { await store.refreshHealth(date:date) }
             .safeAreaInset(edge:.bottom) { if let f = store.focus { FocusBanner(focus:f) } }
         }
+    }
+    var header:some View {
+        ZStack {
+            Text("Hoy").font(.system(size:18,weight:.semibold)).accessibilityAddTraits(.isHeader)
+            HStack {
+                Button(action:openFilters) { HStack(spacing:5) { Text(group.isEmpty ? (HabitTimeFilter(rawValue:time) ?? .all).title : group).lineLimit(1); Image(systemName:"chevron.down").font(.system(size:9)) }.font(.system(size:13)).foregroundStyle(.white).padding(.horizontal,12).frame(height:27).background(Color.repeatPink,in:Capsule()) }.buttonStyle(.plain).frame(maxWidth:145,alignment:.leading).accessibilityLabel("Filtros: \(group.isEmpty ? (HabitTimeFilter(rawValue:time) ?? .all).title : group)").accessibilityHint("Filtrar por estado, horario y grupo")
+                Spacer()
+                Button { catalog = true } label:{Image(systemName:"plus.circle.fill").font(.system(size:25)).foregroundStyle(Color.repeatPink).frame(width:40,height:40)}.buttonStyle(.plain).accessibilityLabel("Crear hábito")
+            }
+        }.frame(height:44).padding(.horizontal,20).padding(.top,3)
     }
     func newHabit() -> Habit { var h = Habit(); h.order = (store.state.snapshot.habits.map(\.order).max() ?? -1)+1; return h }
 }
