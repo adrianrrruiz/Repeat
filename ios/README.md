@@ -10,11 +10,14 @@ Abre `Repeat.xcodeproj` en Xcode y selecciona el scheme Repeat. El proyecto util
 
 - Hábitos ilimitados y formulario nativo: icono, color, grupo, construir/dejar, cantidades, unidades, periodos, frecuencia, horarios y fechas.
 - Lista diaria con anillos semanales y tarjetas de progreso.
-- Guardado local protegido en App Group, con migración desde Documents, notas, estado de ánimo y archivo reversible.
+- Guardado local protegido en Documents; migra el guardado anterior de App Group. Los widgets usan únicamente un resumen en App Group, notas, estado de ánimo y archivo reversible.
 - Temporizador persistente y cronómetro.
 - Calendario, informes semanales/mensuales/anuales y cuadrícula anual.
 - Recordatorios nativos, con permiso solicitado al guardar avisos. Programa los siguientes avisos y renueva la programación al abrir la app; iOS limita la cantidad de avisos pendientes.
 - Catálogo por categorías y creación personalizada, siguiendo el flujo observado.
+- La creación solo cierra después de una escritura correcta. Si falla, muestra el error y conserva el formulario. Cada borrador se guarda por identificador y puede continuarse después de cerrar la app.
+- Derecha: completar; izquierda: añadir, saltar y ocultar. Saltar excluye el día de las rachas/informes; ocultar solo cambia la vista en este iPhone. Ambos se revierten desde «Saltados y ocultos».
+- Eliminar desde ⋯ en la ficha del hábito o el menú al mantener pulsada la tarjeta, con confirmación antes de quitar el hábito y sus registros.
 - Rachas actuales y mejores, gestión, ordenación, duplicación y eliminación de hábitos; cambio de nombre de grupos.
 - Restauración JSON con validación, exportación JSON/CSV e informes compartibles.
 - Lectura de Apple Health por fuente elegida, con historial exclusivamente local; permiso solicitado por el usuario al guardar.
@@ -49,9 +52,16 @@ No es una distribución de App Store o TestFlight. La lectura real de Salud requ
 - Firma automática y perfil de desarrollo generados por Xcode.
 - Instalación confirmada por devicectl y proceso iniciado en el iPhone 14 Pro conectado.
 - Pantalla inicial y formulario comprobados mediante iPhone Mirroring, sin crear hábitos de prueba en el teléfono.
-- Veinticuatro comprobaciones de fechas, frecuencia, metas, límites y codificación/persistencia:
+- Veintinueve comprobaciones de fechas, frecuencia, metas, límites y codificación/persistencia:
 
 ```sh
-xcrun swiftc ios/Repeat/Models.swift ios/Repeat/Metrics.swift ios/tests/main.swift -o ios/build/model-tests
+xcrun swiftc ios/Repeat/Models.swift ios/Repeat/Metrics.swift ios/Repeat/Persistence.swift ios/tests/main.swift -o ios/build/model-tests
 ios/build/model-tests
 ```
+
+## Regresión de creación, versión 1.2
+
+- En el simulador se forzó un fallo real del destino de escritura: el formulario mostró el error, mantuvo todos los valores y no creó un hábito fantasma.
+- Tras reiniciar el proceso, «Continuar» recuperó nombre, descripción, grupo, meta decimal y unidad. Guardar después de restaurar el destino persistió esos campos y retiró el borrador.
+- Un segundo borrador con icono, color, periodo personalizado, ciclo/días, franja, memo y fechas futuras pasó por Crear y se verificó campo por campo en disco.
+- Se comprobaron las acciones nativas Añadir, Saltar, Ocultar, Mostrar y el diálogo de eliminación en el simulador. El gesto físico de arrastre del control remoto en Simulator produjo un toque; queda por verificar el deslizamiento real en el iPhone actualizado.

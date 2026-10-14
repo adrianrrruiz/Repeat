@@ -18,24 +18,35 @@ final class HabitStore: ObservableObject {
     let health = HealthIntegration()
     private var schedulingReminders = false
     private var remindersNeedRefresh = false
-    var entries:[Entry] { state.snapshot.entries.filter { healthConfiguration.sources[$0.habitId] == nil } + healthConfiguration.entries.filter { healthConfiguration.sources[$0.habitId] != nil }.map { healthEntry in var result = healthEntry; if let manual = state.snapshot.entries.first(where:{$0.id == healthEntry.id}) { result.note = manual.note; result.mood = manual.mood }; return result } }
+    var entries:[Entry] {
+        let automatic = healthConfiguration.entries.filter{healthConfiguration.sources[$0.habitId] != nil}
+        let manual = state.snapshot.entries.filter { e in healthConfiguration.sources[e.habitId] == nil || !automatic.contains(where:{$0.id == e.id}) }.map { e in var result = e; if healthConfiguration.sources[e.habitId] != nil { result.value = 0; result.checked = false }; return result }
+        return manual + automatic.map { e in var result = e; if let note = state.snapshot.entries.first(where:{$0.id == e.id}) { result.note = note.note; result.mood = note.mood; result.skipped = note.skipped }; return result }
+    }
     static let origin = "https://repeat-habitos-personal.freevenus7.chatgpt.site"
     let site = URL(string:origin)!
     private let file: URL
     private var stopping = false
+    private var loadFailure:String? = nil
     private let redirectGuard = NoRedirect()
     var active: [Habit] { state.snapshot.habits.filter { !$0.archived }.sorted { $0.order < $1.order } }
     var groups: [String] { Array(Set(active.map(\.group).filter { !$0.isEmpty })).sorted() }
     init() {
-        file = NativeStorage.stateURL
-        if !FileManager.default.fileExists(atPath:file.path),let old = try? Data(contentsOf:URL.documentsDirectory.appending(path:"repeat-state-v1.json")) { try? old.write(to:file,options:[.atomic,.completeFileProtectionUntilFirstUserAuthentication]) }
+        file = URL.documentsDirectory.appending(path:"repeat-state-v2.json")
+        if !FileManager.default.fileExists(atPath:file.path) {
+            let candidates = [NativeStorage.stateURL,URL.documentsDirectory.appending(path:"repeat-state-v1.json")]
+            for candidate in candidates where FileManager.default.fileExists(atPath:candidate.path) {
+                do { let saved = try StateFile(url:candidate).read(); try StateFile(url:file).write(saved); loadFailure = nil; self.error = nil; break }
+                catch { loadFailure = error.localizedDescription; self.error = "No se pudo recuperar el archivo anterior. Se conserva sin modificar: \(error.localizedDescription)" }
+            }
+        }
         if let bytes = try? Data(contentsOf:URL.documentsDirectory.appending(path:"repeat-health-local.json")),let config = try? JSONDecoder().decode(HealthConfiguration.self,from:bytes) { healthConfiguration = config }
-        if let bytes = try? Data(contentsOf:file), let saved = try? JSONDecoder().decode(SavedState.self,from:bytes) { state = saved }
+        if FileManager.default.fileExists(atPath:file.path) { do { state = try StateFile(url:file).read() } catch { loadFailure = error.localizedDescription; self.error = "No se pudo leer el guardado. El archivo se conserva sin modificar." } }
         if let bytes = UserDefaults.standard.data(forKey:"repeat.focus"), let f = try? JSONDecoder().decode(FocusSession.self,from:bytes) { focus = f }
     }
-    func save() {
-        do { try JSONEncoder().encode(state).write(to:file,options:[.atomic,.completeFileProtectionUntilFirstUserAuthentication]); publishWidget() }
-        catch { self.error = "No se pudo guardar en el teléfono: \(error.localizedDescription)" }
+    @discardableResult func save() -> Bool {
+        guard loadFailure == nil else { error = "No se puede guardar hasta recuperar el archivo anterior. Se conserva sin modificar."; return false }; do { try StateFile(url:file).write(state); publishWidget(); return true }
+        catch { self.error = (error as NSError).code == NSFileWriteOutOfSpaceError ? "No hay espacio en el iPhone para guardar. Tu personalización sigue en el formulario." : "No se pudo guardar en el iPhone. Tu personalización sigue en el formulario; vuelve a intentarlo."; return false }
     }
     func apply(_ m: Operation) {
         if m.op == "delete",let id = m.id { state.snapshot.habits.removeAll{$0.id == id}; state.snapshot.entries.removeAll{$0.habitId == id} }
@@ -46,10 +57,11 @@ final class HabitStore: ObservableObject {
             let i = state.snapshot.entries.firstIndex { $0.habitId == id && $0.date == date }
             var e = i.map { state.snapshot.entries[$0] } ?? Entry(habitId:id,date:date)
             switch m.mode {
-            case "increment": e.value = min(1e9,max(0,e.value + (m.value ?? 0))); e.checked = false
-            case "set": e.value = max(0,m.value ?? 0); e.checked = false
-            case "check": e.checked = m.checked ?? true
-            case "clear": e.value = 0; e.checked = false
+            case "skip": e.skipped = m.checked ?? true
+            case "increment": e.skipped = false; e.value = min(1e9,max(0,e.value + (m.value ?? 0))); e.checked = false
+            case "set": e.skipped = false; e.value = max(0,m.value ?? 0); e.checked = false
+            case "check": e.skipped = false; e.checked = m.checked ?? true
+            case "clear": e.skipped = false; e.value = 0; e.checked = false
             case "note": e.note = m.note ?? ""; e.mood = m.mood
             default: break
             }
@@ -57,12 +69,14 @@ final class HabitStore: ObservableObject {
             if let i { state.snapshot.entries[i] = e } else { state.snapshot.entries.append(e) }
         }
     }
-    func mutate(_ m: Operation) {
-        apply(m); state.queue.append(m); save()
+    @discardableResult func mutate(_ m: Operation) -> Bool {
+        let previous = state
+        apply(m); state.queue.append(m)
+        guard save() else { state = previous; return false }
         if ["habit","archive","entry","delete"].contains(m.op) { Task { await scheduleReminders() } }
-        if connected { Task { await sync() } } else { syncText = "Guardado en el iPhone" }
+        if connected { Task { await sync() } } else { syncText = "Guardado en el iPhone" }; return true
     }
-    func storeHabit(_ h: Habit) { mutate(Operation(op:"habit",habit:h)) }
+    @discardableResult func storeHabit(_ h: Habit) -> Bool { mutate(Operation(op:"habit",habit:h)) }
     func entry(_ h: Habit,_ date: String) -> Entry? { entries.first { $0.habitId == h.id && $0.date == date } }
     func add(_ h: Habit,_ date: String,_ amount: Double) { mutate(Operation(op:"entry",id:h.id,date:date,mode:"increment",value:amount)) }
     func complete(_ h: Habit,_ date: String) {
@@ -70,7 +84,11 @@ final class HabitStore: ObservableObject {
         if h.type == "quit" { mutate(Operation(op:"entry",id:h.id,date:date,mode:"check",checked:!p.done)) }
         else { add(h,date,max(0,h.goal-p.value)) }
     }
-    func percentage(_ date: String,_ habits: [Habit]? = nil) -> Double { let hs = (habits ?? active).filter { $0.scheduled(date) }; return hs.isEmpty ? 0 : hs.reduce(0) { $0 + $1.progress(date,entries).ratio } / Double(hs.count) }
+    func isSkipped(_ h:Habit,_ date:String) -> Bool { state.snapshot.entries.contains{$0.habitId == h.id && $0.date == date && $0.skipped == true} }
+    func skip(_ h:Habit,_ date:String,_ skipped:Bool = true) { mutate(Operation(op:"entry",id:h.id,date:date,mode:"skip",checked:skipped)) }
+    func isHidden(_ h:Habit,_ date:String) -> Bool { (UserDefaults.standard.stringArray(forKey:"repeat.hidden."+date) ?? []).contains(h.id) }
+    func hide(_ h:Habit,_ date:String,_ hidden:Bool = true) { var ids = UserDefaults.standard.stringArray(forKey:"repeat.hidden."+date) ?? []; ids.removeAll{$0 == h.id}; if hidden { ids.append(h.id) }; UserDefaults.standard.set(ids,forKey:"repeat.hidden."+date); objectWillChange.send() }
+    func percentage(_ date: String,_ habits: [Habit]? = nil) -> Double { let hs = (habits ?? active).filter { $0.scheduled(date) && !isSkipped($0,date) }; return hs.isEmpty ? 0 : hs.reduce(0) { $0 + $1.progress(date,entries).ratio } / Double(hs.count) }
     func sync() async {
         guard !syncing else { return }
         syncing = true; defer { syncing = false }
@@ -126,7 +144,7 @@ final class HabitStore: ObservableObject {
         if UserDefaults.standard.bool(forKey:"repeat.lockEnabled") { if NativeStorage.writeWidget(WidgetSnapshot(date:date,habits:[],completion:0)) { WidgetCenter.shared.reloadAllTimelines() }; return }
         let eligible = active.filter { healthConfiguration.showOnWidgets || healthConfiguration.sources[$0.id] == nil }
         let automatic = eligible.filter{healthConfiguration.sources[$0.id] != nil}.map(\.id)
-        let records = entries.filter{ e in eligible.contains{$0.id == e.habitId} }.map { WidgetRecord(habitId:$0.habitId,date:$0.date,value:$0.value,checked:$0.checked) }
+        let records = entries.filter{ e in eligible.contains{$0.id == e.habitId} }.map { WidgetRecord(habitId:$0.habitId,date:$0.date,value:$0.value,checked:$0.checked,skipped:$0.skipped) }
         var payload = WidgetSnapshot(date:date,habits:[],completion:0,schedules:eligible,records:records,automaticIDs:automatic)
         let current = payload.forDay(date); payload.habits = current.habits; payload.completion = current.completion
         if NativeStorage.writeWidget(payload) { WidgetCenter.shared.reloadAllTimelines() }
@@ -162,12 +180,12 @@ final class HabitStore: ObservableObject {
     }
     func reorder(_ ids:[String]) { for (index,id) in ids.enumerated() { if var h = state.snapshot.habits.first(where:{$0.id == id}),h.order != index { h.order = index; mutate(Operation(op:"habit",habit:h)) } } }
     func renameGroup(_ old:String,to name:String) { for var h in state.snapshot.habits.filter({$0.group == old}) { h.group = limitedText(name.trimmingCharacters(in:.whitespacesAndNewlines),60); mutate(Operation(op:"habit",habit:h)) } }
-    func delete(_ habit:Habit) { guard focus?.habitId != habit.id else { return }; mutate(Operation(op:"delete",id:habit.id)); healthConfiguration.sources.removeValue(forKey:habit.id); healthConfiguration.entries.removeAll{$0.habitId == habit.id}; saveHealth() }
+    @discardableResult func delete(_ habit:Habit) -> Bool { guard focus?.habitId != habit.id else { return false }; guard mutate(Operation(op:"delete",id:habit.id)) else { return false }; healthConfiguration.sources.removeValue(forKey:habit.id); healthConfiguration.entries.removeAll{$0.habitId == habit.id}; saveHealth(); return true }
     func duplicate(_ habit:Habit) { var h = habit; h.id = UUID().uuidString.lowercased(); h.name = limitedText(h.name+" (copia)",100); h.order = (state.snapshot.habits.map(\.order).max() ?? 0)+1; h.archived = false; storeHabit(h) }
     func restore(_ backup:Snapshot) {
         for h in backup.habits { apply(Operation(op:"habit",habit:h)); state.queue.append(Operation(op:"habit",habit:h)) }
         for e in backup.entries {
-            let operations = [Operation(op:"entry",id:e.habitId,date:e.date,mode:"set",value:e.value),Operation(op:"entry",id:e.habitId,date:e.date,mode:"check",checked:e.checked),Operation(op:"entry",id:e.habitId,date:e.date,mode:"note",note:e.note,mood:e.mood)]
+            let operations = [Operation(op:"entry",id:e.habitId,date:e.date,mode:"set",value:e.value),Operation(op:"entry",id:e.habitId,date:e.date,mode:"check",checked:e.checked),Operation(op:"entry",id:e.habitId,date:e.date,mode:"note",note:e.note,mood:e.mood),Operation(op:"entry",id:e.habitId,date:e.date,mode:"skip",checked:e.skipped ?? false)]
             for op in operations { apply(op); state.queue.append(op) }
         }
         for mood in backup.moods { let op = Operation(op:"mood",date:mood.date,note:mood.note,mood:mood.mood); apply(op); state.queue.append(op) }
@@ -183,7 +201,7 @@ final class HabitStore: ObservableObject {
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
         var candidates: [(Date,Habit,String)] = []
         let today = Day.key(Date())
-        for offset in 0..<30 { let date = Day.shift(today,offset); for h in active where h.scheduled(date) && (date != today || !h.progress(date,entries).done) { for time in h.reminders { let pieces = time.split(separator:":").compactMap { Int($0) }; if pieces.count == 2 { var c = Calendar.current.dateComponents([.year,.month,.day],from:Day.date(date)); c.hour = pieces[0]; c.minute = pieces[1]; if let at = Calendar.current.date(from:c),at > Date() { candidates.append((at,h,time)); if UserDefaults.standard.bool(forKey:"repeat.superAlert."+h.id) { for delay in [5,10,15] { let repeatAt = at.addingTimeInterval(Double(delay)*60); if Day.key(repeatAt) == date { candidates.append((repeatAt,h,time+"-\(delay)")) } } } } } } } }
+        for offset in 0..<30 { let date = Day.shift(today,offset); for h in active where h.scheduled(date) && !isSkipped(h,date) && (date != today || !h.progress(date,entries).done) { for time in h.reminders { let pieces = time.split(separator:":").compactMap { Int($0) }; if pieces.count == 2 { var c = Calendar.current.dateComponents([.year,.month,.day],from:Day.date(date)); c.hour = pieces[0]; c.minute = pieces[1]; if let at = Calendar.current.date(from:c),at > Date() { candidates.append((at,h,time)); if UserDefaults.standard.bool(forKey:"repeat.superAlert."+h.id) { for delay in [5,10,15] { let repeatAt = at.addingTimeInterval(Double(delay)*60); if Day.key(repeatAt) == date { candidates.append((repeatAt,h,time+"-\(delay)")) } } } } } } } }
         for (at,h,time) in candidates.sorted(by:{$0.0 < $1.0}).prefix(60) {
             let content = UNMutableNotificationContent(); content.title = "\(h.icon) \(h.name)"; content.body = "Un pequeño paso para tu rutina. \(h.goalLabel)"; content.sound = .default
             let trigger = UNCalendarNotificationTrigger(dateMatching:Calendar.current.dateComponents([.year,.month,.day,.hour,.minute],from:at),repeats:false)

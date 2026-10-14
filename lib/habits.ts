@@ -22,14 +22,14 @@ export const habitSchema = z.object({
  if(['week-count','month-count','cycle-count'].includes(h.frequency) && h.targetDays>targetMax) c.addIssue({code:'custom',path:['targetDays'],message:'La frecuencia supera los días del periodo.'});
 });
 export type Habit = z.infer<typeof habitSchema>;
-export type Entry = {habitId:string;date:string;value:number;checked:boolean;note:string;mood:number|null;updatedAt:string};
+export type Entry = {habitId:string;date:string;value:number;checked:boolean;skipped?:boolean;note:string;mood:number|null;updatedAt:string};
 export type Mood = {date:string;mood:number;note:string};
 export type Snapshot = {habits:Habit[];entries:Entry[];moods:Mood[]};
 export const mutationSchema = z.discriminatedUnion('op',[
  z.object({op:z.literal('habit'),habit:habitSchema}),
  z.object({op:z.literal('archive'),id:idSchema,archived:z.boolean()}),
  z.object({op:z.literal('delete'),id:idSchema}),
- z.object({op:z.literal('entry'),id:idSchema,date:daySchema,mode:z.enum(['increment','set','check','clear','note']),value:z.number().finite().min(-1000000000).max(1000000000).optional(),checked:z.boolean().optional(),note:z.string().max(5000).optional(),mood:z.number().int().min(1).max(5).nullable().optional()}),
+ z.object({op:z.literal('entry'),id:idSchema,date:daySchema,mode:z.enum(['increment','set','check','clear','note','skip']),value:z.number().finite().min(-1000000000).max(1000000000).optional(),checked:z.boolean().optional(),note:z.string().max(5000).optional(),mood:z.number().int().min(1).max(5).nullable().optional()}),
  z.object({op:z.literal('mood'),date:daySchema,mood:z.number().int().min(1).max(5),note:z.string().max(5000)})
 ]);
 export type Mutation = z.infer<typeof mutationSchema>;
@@ -56,14 +56,14 @@ export function periodBounds(h:Habit,date:string):[string,string]{
 }
 export function entryFor(entries:Entry[],id:string,date:string){return entries.find(e=>e.habitId===id&&e.date===date);}
 export function progress(h:Habit,date:string,entries:Entry[]){const [start,end]=periodBounds(h,date);const rows=entries.filter(e=>e.habitId===h.id&&e.date>=start&&e.date<=end&&inRange(h,e.date));const value=rows.reduce((s,e)=>s+e.value,0);const checked=rows.some(e=>e.checked);const done=h.type==='quit'?checked&&value<=h.goal:value>=h.goal||checked;return {value,done,ratio:done?1:h.type==='quit'?0:Math.min(1,value/h.goal)};}
-export function percentage(habits:Habit[],entries:Entry[],date:string){const list=habits.filter(h=>scheduled(h,date));if(!list.length)return 0;return list.reduce((s,h)=>s+progress(h,date,entries).ratio,0)/list.length;}
+export function percentage(habits:Habit[],entries:Entry[],date:string){const list=habits.filter(h=>scheduled(h,date)&&!entryFor(entries,h.id,date)?.skipped);if(!list.length)return 0;return list.reduce((s,h)=>s+progress(h,date,entries).ratio,0)/list.length;}
 export function streaks(h:Habit,entries:Entry[],today:string){
  const blocks=new Map<string,{done:boolean;end:string}>();
  const quota=h.period==='day'&&['week-count','month-count','cycle-count'].includes(h.frequency);
  if(quota){
   const counts=new Map<string,{completed:number;end:string}>();
   for(let d=h.startDate;d<=today;d=shiftDay(d,1)){
-   if(!scheduled(h,d))continue;
+   if(!scheduled(h,d)||entryFor(entries,h.id,d)?.skipped)continue;
    let start:string,end:string;
    if(h.frequency==='week-count'){start=weekStart(d);end=shiftDay(start,6);}
    else if(h.frequency==='month-count'){start=d.slice(0,7)+'-01';const x=parseDay(d);end=dateKey(new Date(x.getFullYear(),x.getMonth()+1,0));}
@@ -73,7 +73,7 @@ export function streaks(h:Habit,entries:Entry[],today:string){
   for(const [key,b] of counts)blocks.set(key,{done:b.completed>=h.targetDays,end:b.end});
  }else{
   for(let d=h.startDate;d<=today;d=shiftDay(d,1)){
-   if(!scheduled(h,d))continue;const [key,end]=periodBounds(h,d);if(!blocks.has(key))blocks.set(key,{done:progress(h,d,entries).done,end});
+   if(!scheduled(h,d)||entryFor(entries,h.id,d)?.skipped)continue;const [key,end]=periodBounds(h,d);if(!blocks.has(key))blocks.set(key,{done:progress(h,d,entries).done,end});
   }
  }
  let best=0,run=0;for(const b of blocks.values()){if(b.done){run++;best=Math.max(best,run);}else if(b.end<today)run=0;}
@@ -82,10 +82,10 @@ export function streaks(h:Habit,entries:Entry[],today:string){
 export function prettyNumber(n:number){return new Intl.NumberFormat('es-CO',{maximumFractionDigits:2}).format(n);}
 export function goalLabel(h:Habit){return `${prettyNumber(h.goal)} ${h.unit}${h.unit?' ':''}/ ${h.period==='day'?'día':h.period==='week'?'semana':h.period==='month'?'mes':`${h.periodDays} días`}`;}
 export function rangeStats(h:Habit,entries:Entry[],start:string,end:string){
- const slots=new Map<string,boolean>();for(let d=start;d<=end;d=shiftDay(d,1)){if(scheduled(h,d)){const key=periodBounds(h,d)[0];slots.set(key,progress(h,d,entries).done);}}
+ const slots=new Map<string,boolean>();for(let d=start;d<=end;d=shiftDay(d,1)){if(scheduled(h,d)&&!entryFor(entries,h.id,d)?.skipped){const key=periodBounds(h,d)[0];slots.set(key,progress(h,d,entries).done);}}
  let total=slots.size,done=[...slots.values()].filter(Boolean).length;
  if(h.period==='day' && ['week-count','month-count','cycle-count'].includes(h.frequency)){
-  const blocks=new Map<string,{days:number;done:number}>();for(let d=start;d<=end;d=shiftDay(d,1)){if(!scheduled(h,d))continue;const key=h.frequency==='week-count'?weekStart(d):h.frequency==='month-count'?d.slice(0,7):String(Math.floor(dayDifference(d,h.startDate)/h.cycleDays));const b=blocks.get(key)||{days:0,done:0};b.days++;if(progress(h,d,entries).done)b.done++;blocks.set(key,b);}
+  const blocks=new Map<string,{days:number;done:number}>();for(let d=start;d<=end;d=shiftDay(d,1)){if(!scheduled(h,d)||entryFor(entries,h.id,d)?.skipped)continue;const key=h.frequency==='week-count'?weekStart(d):h.frequency==='month-count'?d.slice(0,7):String(Math.floor(dayDifference(d,h.startDate)/h.cycleDays));const b=blocks.get(key)||{days:0,done:0};b.days++;if(progress(h,d,entries).done)b.done++;blocks.set(key,b);}
   total=0;done=0;for(const b of blocks.values()){const quota=Math.min(h.targetDays,b.days);total+=quota;done+=Math.min(quota,b.done);}
  }return {total,done,rate:total?done/total:0};
 }

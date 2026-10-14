@@ -15,6 +15,13 @@
       "when": 1791915577018,
       "tag": "0001_great_lizard",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791947142794,
+      "tag": "0002_rich_black_bird",
+      "breakpoints": true
     }
   ]
 }

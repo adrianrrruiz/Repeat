@@ -27,6 +27,10 @@ test('API: ocho hábitos, persistencia, concurrencia, reintentos y aislamiento',
  assert.equal((await post(a,{op:'mood',date:dateKey(),mood:4,note:'Prueba'})).data.moods[0].mood,4);
  assert.equal((await get(b)).entries.length,0);
  const latest=await get(a);assert.equal(latest.habits.length,8);assert.equal(latest.entries[0].note,'Nota de prueba');
+ assert.equal((await post(a,{op:'entry',id:hs[0].id,date:dateKey(),mode:'skip',checked:true})).status,200);
+ assert.equal((await get(a)).entries[0].skipped,true);
+ assert.equal((await post(b,{op:'entry',id:hs[0].id,date:dateKey(),mode:'skip',checked:false})).status,404);
+ assert.equal((await post(a,{op:'entry',id:hs[0].id,date:dateKey(),mode:'skip',checked:false})).data.entries[0].skipped,false);
  const deletion={op:'delete',id:hs[0].id,requestId:crypto.randomUUID()};
  assert.equal((await post(b,deletion)).status,404,'otro usuario no puede eliminar el hábito');
  assert.equal((await post(a,deletion)).status,200);

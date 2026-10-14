@@ -14,10 +14,19 @@ struct HabitEditor: View {
     @State private var initializedHealth = false
     @State private var superAlert = false
     let suggestedHealth:String?
-    init(initial: Habit,suggestedHealth:String? = nil) {
+    let isNew:Bool
+    let draftKey:String
+    let onSaved:((Habit)->Void)?
+    var draftState:EditorDraft { EditorDraft(habit:draft,goalText:goalText,reminderTimes:reminderTimes,healthEnabled:healthEnabled,healthSourceID:healthSourceID,superAlert:superAlert) }
+    init(initial: Habit,suggestedHealth:String? = nil,isNew:Bool = false,onSaved:((Habit)->Void)? = nil) {
+        self.isNew = isNew; self.draftKey = initial.id; self.onSaved = onSaved
         self.suggestedHealth = suggestedHealth
-        _draft = State(initialValue:initial); _goalText = State(initialValue:String(initial.goal))
-        _reminderTimes = State(initialValue:initial.reminders.compactMap { value in let parts = value.split(separator:":").compactMap { Int($0) }; guard parts.count == 2 else { return nil }; return Calendar.current.date(bySettingHour:parts[0],minute:parts[1],second:0,of:Date()) })
+        let recovered = EditorDraft.read(isNew:isNew,id:initial.id)
+        _draft = State(initialValue:recovered?.habit ?? initial); _goalText = State(initialValue:recovered?.goalText ?? String(initial.goal))
+        _healthEnabled = State(initialValue:recovered?.healthEnabled ?? (suggestedHealth != nil)); _healthSourceID = State(initialValue:recovered?.healthSourceID ?? suggestedHealth ?? "steps")
+        _superAlert = State(initialValue:recovered?.superAlert ?? UserDefaults.standard.bool(forKey:"repeat.superAlert."+initial.id))
+        _initializedHealth = State(initialValue:recovered != nil)
+        _reminderTimes = State(initialValue:recovered?.reminderTimes ?? initial.reminders.compactMap { value in let parts = value.split(separator:":").compactMap { Int($0) }; guard parts.count == 2 else { return nil }; return Calendar.current.date(bySettingHour:parts[0],minute:parts[1],second:0,of:Date()) })
     }
     let palette = ["#FF5B86","#5CBAF0","#3BD6BE","#8D71E1","#F4B357","#EC88B5","#7895E0","#8FC77D","#7D8796","#D4A37C","#76C8D0","#F4756A"]
     let frequencyNames = [("daily","Todos los días"),("weekdays","Días de la semana"),("week-count","Días por semana"),("monthdays","Días del mes"),("month-count","Días por mes"),("cycle-days","Días de cada ciclo"),("cycle-count","Días por ciclo")]
@@ -56,9 +65,12 @@ struct HabitEditor: View {
                     Toggle("Fecha de finalización",isOn:Binding(get:{draft.endDate != nil},set:{draft.endDate = $0 ? max(draft.startDate,Day.key(Date())) : nil}))
                     if let end = draft.endDate { DatePicker("Terminar el",selection:Binding(get:{Day.date(end)},set:{draft.endDate = Day.key($0)}),in:Day.date(draft.startDate)...,displayedComponents:.date) }
                 }
-            }.scrollContentBackground(.hidden).background(draft.tint.opacity(0.07)).navigationTitle("\(draft.icon) \(draft.name.isEmpty ? "Hábito personalizado" : draft.name)").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement:.principal) { Text("\(draft.icon) \(draft.name.isEmpty ? "Personalizado" : draft.name)").font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.7) }; ToolbarItem(placement:.cancellationAction) { Button("Cancelar") { dismiss() } }; ToolbarItem(placement:.confirmationAction) { Button(authorizing ? "Guardando…" : "Guardar") { save() }.fontWeight(.semibold).disabled(authorizing) } }
+            }.disabled(authorizing).scrollContentBackground(.hidden).background(draft.tint.opacity(0.07)).navigationTitle("\(draft.icon) \(draft.name.isEmpty ? "Hábito personalizado" : draft.name)").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement:.principal) { Text("\(draft.icon) \(draft.name.isEmpty ? "Personalizado" : draft.name)").font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.7) }; ToolbarItem(placement:.cancellationAction) { Button("Cancelar") { preserveDraft(); dismiss() }.disabled(authorizing) }; ToolbarItem(placement:.confirmationAction) { Button(authorizing ? "Guardando…" : isNew ? "Crear" : "Guardar") { save() }.fontWeight(.semibold).disabled(authorizing) } }
             .onAppear { guard !initializedHealth else { return }; initializedHealth = true; superAlert = UserDefaults.standard.bool(forKey:"repeat.superAlert."+draft.id); if let source = store.healthConfiguration.sources[draft.id] ?? suggestedHealth { healthEnabled = true; healthSourceID = source; if let data = HealthSource.all.first(where:{$0.id == source}) { draft.unit = data.unit } } }
+            .interactiveDismissDisabled(authorizing)
+            .onChange(of:draftState) { _,_ in preserveDraft() }
+            .onDisappear { if !saved { preserveDraft() } }
             .onChange(of:healthSourceID) { _,id in if healthEnabled,let source = HealthSource.all.first(where:{$0.id == id}) { draft.unit = source.unit } }
             .alert("Revisa tu hábito",isPresented:Binding(get:{validation != nil},set:{if !$0 { validation = nil }})) { Button("Aceptar") {} } message: { Text(validation ?? "") }
         }
@@ -101,10 +113,14 @@ struct HabitEditor: View {
         if healthEnabled,let source = HealthSource.all.first(where:{$0.id == healthSourceID}) { draft.unit = source.unit; authorizing = true; Task { do { try await store.health.request(source); commit() } catch { validation = error.localizedDescription; authorizing = false } }; return }
         commit()
     }
+    @State private var saved = false
+    func preserveDraft() { do { try draftState.write(isNew:isNew,id:draftKey) } catch { validation = "No se pudo conservar el borrador: \(error.localizedDescription)" } }
     func commit() {
-        UserDefaults.standard.set(superAlert,forKey:"repeat.superAlert."+draft.id); store.storeHabit(draft); store.configureHealth(draft,source:healthEnabled ? healthSourceID : nil)
+        preserveDraft()
+        guard store.storeHabit(draft) else { validation = store.error ?? "No se pudo guardar. Tu personalización sigue en este formulario."; store.error = nil; authorizing = false; return }
+        UserDefaults.standard.set(superAlert,forKey:"repeat.superAlert."+draft.id); store.configureHealth(draft,source:healthEnabled ? healthSourceID : nil)
         if !draft.reminders.isEmpty { Task { let center = UNUserNotificationCenter.current(); let s = await center.notificationSettings(); if s.authorizationStatus == .notDetermined { _ = try? await center.requestAuthorization(options:[.alert,.sound,.badge]) }; await store.scheduleReminders() } }
-        dismiss()
+        saved = true; EditorDraft.clear(isNew:isNew,id:draftKey); onSaved?(draft); dismiss()
     }
 }
 struct IconChooser: View {

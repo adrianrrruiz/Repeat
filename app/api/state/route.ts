@@ -8,10 +8,10 @@ async function snapshot(userId:string){
  const db=env.DB!;
  const [habits,entries,moods]=await db.batch([
   db.prepare('SELECT content FROM habits WHERE user_id=?').bind(userId),
-  db.prepare('SELECT habit_id AS habitId,date,value,checked,note,mood,updated_at AS updatedAt FROM entries WHERE user_id=?').bind(userId),
+  db.prepare('SELECT habit_id AS habitId,date,value,checked,skipped,note,mood,updated_at AS updatedAt FROM entries WHERE user_id=?').bind(userId),
   db.prepare('SELECT date,mood,note FROM moods WHERE user_id=?').bind(userId)
  ]);
- return {habits:(habits.results as {content:string}[]).map(r=>JSON.parse(r.content) as Habit).sort((a,b)=>a.order-b.order),entries:(entries.results as Record<string,unknown>[]).map(r=>({...r,checked:!!r.checked})),moods:moods.results};
+ return {habits:(habits.results as {content:string}[]).map(r=>JSON.parse(r.content) as Habit).sort((a,b)=>a.order-b.order),entries:(entries.results as Record<string,unknown>[]).map(r=>({...r,checked:!!r.checked,skipped:!!r.skipped})),moods:moods.results};
 }
 export async function GET(){
  const user=await getChatGPTUser();if(!user)return response({error:'Inicia sesión para ver tus hábitos.'},401);
@@ -35,19 +35,20 @@ export async function POST(request:Request){
    if(m.op==='delete'){if(!rid.success)return response({error:'Identificador inválido.'},400);await db.batch([db.prepare('DELETE FROM entries WHERE user_id=? AND habit_id=?').bind(uid,m.id),db.prepare('DELETE FROM habits WHERE user_id=? AND id=?').bind(uid,m.id),db.prepare('INSERT OR IGNORE INTO operation_receipts(user_id,request_id,created_at) VALUES(?,?,?)').bind(uid,rid.data,now)]);}
    else if(m.op==='archive'){h.archived=m.archived;await db.prepare('UPDATE habits SET content=?,updated_at=? WHERE user_id=? AND id=?').bind(JSON.stringify(h),now,uid,m.id).run();}
    else{
-    if(m.mode==='clear')await db.prepare('UPDATE entries SET value=0,checked=0 WHERE user_id=? AND habit_id=? AND date=?').bind(uid,m.id,m.date).run();
+    if(m.mode==='skip')await db.prepare('INSERT INTO entries(user_id,habit_id,date,skipped,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,habit_id,date) DO UPDATE SET skipped=excluded.skipped,updated_at=excluded.updated_at').bind(uid,m.id,m.date,m.checked?1:0,now).run();
+    else if(m.mode==='clear')await db.prepare('UPDATE entries SET value=0,checked=0,skipped=0 WHERE user_id=? AND habit_id=? AND date=?').bind(uid,m.id,m.date).run();
     else if(m.mode==='note')await db.prepare('INSERT INTO entries(user_id,habit_id,date,note,mood,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,habit_id,date) DO UPDATE SET note=excluded.note,mood=excluded.mood,updated_at=excluded.updated_at').bind(uid,m.id,m.date,m.note??'',m.mood??null,now).run();
-    else if(m.mode==='check')await db.prepare('INSERT INTO entries(user_id,habit_id,date,checked,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,habit_id,date) DO UPDATE SET checked=excluded.checked,updated_at=excluded.updated_at').bind(uid,m.id,m.date,m.checked?1:0,now).run();
+    else if(m.mode==='check')await db.prepare('INSERT INTO entries(user_id,habit_id,date,checked,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,habit_id,date) DO UPDATE SET checked=excluded.checked,skipped=0,updated_at=excluded.updated_at').bind(uid,m.id,m.date,m.checked?1:0,now).run();
     else{
      if(m.value===undefined || (m.mode==='set'&&m.value<0))return response({error:'Ingresa un valor válido.'},400);
      const value=Math.max(0,m.value);
      if(m.mode==='increment'&&rid.success){
       const guard='NOT EXISTS(SELECT 1 FROM operation_receipts WHERE user_id=? AND request_id=?)';
       await db.batch([
-       db.prepare(`INSERT INTO entries(user_id,habit_id,date,value,updated_at) SELECT ?,?,?,?,? WHERE ${guard} ON CONFLICT(user_id,habit_id,date) DO UPDATE SET value=MIN(1000000000,MAX(0,entries.value+?)),checked=0,updated_at=excluded.updated_at WHERE ${guard}`).bind(uid,m.id,m.date,value,now,uid,rid.data,m.value,uid,rid.data),
+       db.prepare(`INSERT INTO entries(user_id,habit_id,date,value,updated_at) SELECT ?,?,?,?,? WHERE ${guard} ON CONFLICT(user_id,habit_id,date) DO UPDATE SET value=MIN(1000000000,MAX(0,entries.value+?)),checked=0,skipped=0,updated_at=excluded.updated_at WHERE ${guard}`).bind(uid,m.id,m.date,value,now,uid,rid.data,m.value,uid,rid.data),
        db.prepare('INSERT OR IGNORE INTO operation_receipts(user_id,request_id,created_at) VALUES(?,?,?)').bind(uid,rid.data,now)
       ]);
-     }else await db.prepare('INSERT INTO entries(user_id,habit_id,date,value,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,habit_id,date) DO UPDATE SET value=excluded.value,checked=0,updated_at=excluded.updated_at').bind(uid,m.id,m.date,value,now).run();
+     }else await db.prepare('INSERT INTO entries(user_id,habit_id,date,value,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,habit_id,date) DO UPDATE SET value=excluded.value,checked=0,skipped=0,updated_at=excluded.updated_at').bind(uid,m.id,m.date,value,now).run();
     }
    }
   }

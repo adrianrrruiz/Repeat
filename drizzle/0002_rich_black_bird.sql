@@ -1,0 +1,1 @@
+ALTER TABLE `entries` ADD `skipped` integer DEFAULT false NOT NULL;

@@ -54,7 +54,7 @@ struct Habit: Codable, Identifiable, Hashable {
 }
 struct Progress { var value: Double; var done: Bool; var ratio: Double }
 struct Entry: Codable, Identifiable {
-    var habitId: String; var date: String; var value: Double = 0; var checked = false; var note = ""; var mood: Int? = nil; var updatedAt = ISO8601DateFormatter().string(from: Date())
+    var habitId: String; var date: String; var value: Double = 0; var checked = false; var note = ""; var skipped:Bool? = nil; var mood: Int? = nil; var updatedAt = ISO8601DateFormatter().string(from: Date())
     var id: String { habitId + ":" + date }
 }
 struct Mood: Codable, Identifiable { var date: String; var mood: Int; var note: String; var id: String { date } }

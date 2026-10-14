@@ -44,3 +44,22 @@ do { _ = try readBackup(JSONEncoder().encode(invalid)); fatalError("Aceptó háb
 invalid = valid; invalid.entries[0].date = "2026-02-30"
 do { _ = try readBackup(JSONEncoder().encode(invalid)); fatalError("Aceptó fecha inexistente") } catch { }
 print("12 comprobaciones adicionales de rachas, cuotas, copia y Unicode: correctas")
+let repositoryDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("repeat-persistence-"+UUID().uuidString)
+defer { try? FileManager.default.removeItem(at:repositoryDirectory) }
+let repository = StateFile(url:repositoryDirectory.appendingPathComponent("Documents/state.json"))
+var customized = Habit(); customized.name = "Rutina personalizada"; customized.description = "Descripción larga con 🧘"; customized.group = "Bienestar"; customized.icon = "🧘"; customized.color = "#7895E0"; customized.goal = 2.5; customized.unit = "hr"; customized.frequency = "cycle-days"; customized.cycleDays = 5; customized.days = [1,3,5]; customized.period = "custom"; customized.periodDays = 10; customized.reminders = ["08:35","21:15"]; customized.memoAfter = true; customized.startDate = "2026-10-14"; customized.endDate = "2027-01-20"
+let operation = Operation(op:"habit",habit:customized)
+let customizedState = SavedState(snapshot:Snapshot(habits:[customized]),queue:[operation])
+try repository.write(customizedState)
+let disk = try repository.read()
+check(disk.snapshot.habits.first == customized,"Guarda cada campo de un hábito personalizado")
+check(disk.queue.first?.requestId == operation.requestId,"Guarda la cola con identificador estable")
+let blockedPath = repositoryDirectory.appendingPathComponent("blocked")
+try Data("archivo".utf8).write(to:blockedPath)
+do { try StateFile(url:blockedPath.appendingPathComponent("state.json")).write(customizedState); fatalError("La escritura debería fallar") } catch { }
+let afterFailure = try repository.read()
+check(afterFailure.snapshot.habits.first == customized,"Un fallo no daña el último guardado")
+let skipped = completed + [Entry(habitId:daily.id,date:"2026-10-13",skipped:true)]
+check(metrics(daily,skipped,today:"2026-10-14").current == 3,"Saltar un día conserva la racha anterior")
+check(rangeTotals([daily],skipped,start:"2026-10-10",end:"2026-10-13").0 == 3,"Un día saltado no cuenta como fallo")
+print("5 comprobaciones de persistencia completa, fallo de disco y días saltados: correctas")

@@ -17,7 +17,7 @@ func metrics(_ habit: Habit,_ entries: [Entry],today: String = Day.key(Date())) 
     var date = habit.startDate
     while date <= today {
         defer { date = Day.shift(date,1) }
-        guard habit.scheduled(date) else { continue }
+        guard habit.scheduled(date),!entries.contains(where:{$0.habitId == habit.id && $0.date == date && $0.skipped == true}) else { continue }
         let p = habit.progress(date,entries)
         if p.done && habit.period == "day" { result.successes += 1; if date.hasPrefix(String(today.prefix(7))) { result.monthSuccesses += 1 } }
         if quota {
@@ -42,7 +42,7 @@ func rangeTotals(_ habits:[Habit],_ entries:[Entry],start:String,end:String) -> 
     for h in habits {
         var slots: [String:Bool] = [:]; var quotas: [String:(Int,Int)] = [:]; var d = start
         while d <= end {
-            if h.scheduled(d) {
+            if h.scheduled(d) && !entries.contains(where:{$0.habitId == h.id && $0.date == d && $0.skipped == true}) {
                 if h.period == "day" && h.frequency.hasSuffix("count") {
                     let key = h.frequency == "week-count" ? Day.weekStart(d) : h.frequency == "month-count" ? String(d.prefix(7)) : String(Day.distance(h.startDate,d)/max(1,h.cycleDays))
                     let b = quotas[key] ?? (0,0); quotas[key] = (b.0+1,b.1+(h.progress(d,entries).done ? 1 : 0))
