@@ -18,7 +18,7 @@ final class HabitStore: ObservableObject {
     let health = HealthIntegration()
     private var schedulingReminders = false
     private var remindersNeedRefresh = false
-    var entries:[Entry] { state.snapshot.entries.filter { healthConfiguration.sources[$0.habitId] == nil } + healthConfiguration.entries.filter { healthConfiguration.sources[$0.habitId] != nil } }
+    var entries:[Entry] { state.snapshot.entries.filter { healthConfiguration.sources[$0.habitId] == nil } + healthConfiguration.entries.filter { healthConfiguration.sources[$0.habitId] != nil }.map { healthEntry in var result = healthEntry; if let manual = state.snapshot.entries.first(where:{$0.id == healthEntry.id}) { result.note = manual.note; result.mood = manual.mood }; return result } }
     static let origin = "https://repeat-habitos-personal.freevenus7.chatgpt.site"
     let site = URL(string:origin)!
     private let file: URL
@@ -109,6 +109,7 @@ final class HabitStore: ObservableObject {
         focus = FocusSession(habitId:h.id,date:date,start:Date(),seconds:seconds,countdown:countdown)
         UserDefaults.standard.set(try? JSONEncoder().encode(focus),forKey:"repeat.focus")
         if let focus { FocusActivityController.start(focus,habit:h) }
+        if countdown { Task { let center = UNUserNotificationCenter.current(); let settings = await center.notificationSettings(); if settings.authorizationStatus == .notDetermined { _ = try? await center.requestAuthorization(options:[.alert,.sound,.badge]) }; guard let current = focus,current.habitId == h.id else { return }; let remaining = current.start.addingTimeInterval(current.seconds).timeIntervalSinceNow; guard remaining > 0 else { return }; let content = UNMutableNotificationContent(); content.title = "Temporizador terminado"; content.body = "\(h.icon) \(h.name)"; content.sound = .default; try? await center.add(UNNotificationRequest(identifier:"repeat-focus",content:content,trigger:UNTimeIntervalNotificationTrigger(timeInterval:max(1,remaining),repeats:false))) } }
     }
     func stopFocus() {
         guard !stopping, let f = focus, let h = state.snapshot.habits.first(where:{$0.id == f.habitId}) else { return }
@@ -117,7 +118,7 @@ final class HabitStore: ObservableObject {
         var op = Operation(op:"entry",id:h.id,date:f.date,mode:"increment",value:elapsed/(h.unit == "hr" ? 3600 : h.unit == "min" ? 60 : 1)); op.requestId = f.requestId
         // Persist progress and clear the timer before starting an asynchronous network request.
         if !state.queue.contains(where:{$0.requestId == f.requestId}) { apply(op); state.queue.append(op); save() }
-        focus = nil; UserDefaults.standard.removeObject(forKey:"repeat.focus"); FocusActivityController.stop(); stopping = false
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers:["repeat-focus"]); focus = nil; UserDefaults.standard.removeObject(forKey:"repeat.focus"); FocusActivityController.stop(); stopping = false
         if connected { Task { await sync() } }
     }
     func publishWidget() {
@@ -182,7 +183,7 @@ final class HabitStore: ObservableObject {
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
         var candidates: [(Date,Habit,String)] = []
         let today = Day.key(Date())
-        for offset in 0..<30 { let date = Day.shift(today,offset); for h in active where h.scheduled(date) && (date != today || !h.progress(date,entries).done) { for time in h.reminders { let pieces = time.split(separator:":").compactMap { Int($0) }; if pieces.count == 2 { var c = Calendar.current.dateComponents([.year,.month,.day],from:Day.date(date)); c.hour = pieces[0]; c.minute = pieces[1]; if let at = Calendar.current.date(from:c),at > Date() { candidates.append((at,h,time)) } } } } }
+        for offset in 0..<30 { let date = Day.shift(today,offset); for h in active where h.scheduled(date) && (date != today || !h.progress(date,entries).done) { for time in h.reminders { let pieces = time.split(separator:":").compactMap { Int($0) }; if pieces.count == 2 { var c = Calendar.current.dateComponents([.year,.month,.day],from:Day.date(date)); c.hour = pieces[0]; c.minute = pieces[1]; if let at = Calendar.current.date(from:c),at > Date() { candidates.append((at,h,time)); if UserDefaults.standard.bool(forKey:"repeat.superAlert."+h.id) { for delay in [5,10,15] { let repeatAt = at.addingTimeInterval(Double(delay)*60); if Day.key(repeatAt) == date { candidates.append((repeatAt,h,time+"-\(delay)")) } } } } } } } }
         for (at,h,time) in candidates.sorted(by:{$0.0 < $1.0}).prefix(60) {
             let content = UNMutableNotificationContent(); content.title = "\(h.icon) \(h.name)"; content.body = "Un pequeño paso para tu rutina. \(h.goalLabel)"; content.sound = .default
             let trigger = UNCalendarNotificationTrigger(dateMatching:Calendar.current.dateComponents([.year,.month,.day,.hour,.minute],from:at),repeats:false)

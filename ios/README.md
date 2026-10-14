@@ -41,7 +41,7 @@ xcrun devicectl device process launch --device 81498727-3564-539A-A0AE-7C73C955D
 
 El perfil de desarrollo instalado vence el 20 de octubre de 2026 a las 19:22, hora de Bogotá. Antes o después de esa fecha, vuelve a compilar e instalar con el mismo bundle ID para renovar la firma conservando los datos. No desinstales la app para renovarla.
 
-No es una distribución de App Store o TestFlight. La lectura real de Salud requiere que el propietario conceda permisos. La ejecución interactiva de widgets y Actividades en Vivo no se ha comprobado con hábitos reales. Super Alert, medidor propietario de estrés y funciones sociales no están incluidos.
+No es una distribución de App Store o TestFlight. La lectura real de Salud requiere que el propietario conceda permisos. La ejecución interactiva de widgets y Actividades en Vivo no se ha comprobado con hábitos reales. La alerta reforzada tiene intervalos propios de 5, 10 y 15 minutos. El medidor propietario de estrés y las funciones sociales no están incluidos.
 
 ## Verificación realizada
 

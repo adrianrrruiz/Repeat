@@ -12,6 +12,7 @@ struct HabitEditor: View {
     @State private var healthSourceID = "steps"
     @State private var authorizing = false
     @State private var initializedHealth = false
+    @State private var superAlert = false
     let suggestedHealth:String?
     init(initial: Habit,suggestedHealth:String? = nil) {
         self.suggestedHealth = suggestedHealth
@@ -44,6 +45,8 @@ struct HabitEditor: View {
                 } footer: { Text(draft.type == "quit" ? "Registra el consumo y confirma que no superaste tu límite." : "Completa tu meta en el periodo elegido.") }
                 Section("Franja horaria") { Picker("Horario",selection:$draft.timeOfDay) { Text("Cualquiera").tag("any"); Text("Mañana").tag("morning"); Text("Tarde").tag("afternoon"); Text("Noche").tag("evening") }.pickerStyle(.segmented) }
                 Section {
+                    Toggle("Recordatorios",isOn:Binding(get:{!reminderTimes.isEmpty},set:{ enabled in reminderTimes = enabled ? [Calendar.current.date(bySettingHour:9,minute:0,second:0,of:Date())!] : [] }))
+                    if !reminderTimes.isEmpty { Toggle("Alerta reforzada",isOn:$superAlert); if superAlert { Text("Repite el aviso a los 5, 10 y 15 minutos. Esta opción se guarda en este iPhone.").font(.caption).foregroundStyle(.secondary) } }
                     ForEach(reminderTimes.indices,id:\.self) { i in HStack { DatePicker("Aviso \(i+1)",selection:$reminderTimes[i],displayedComponents:.hourAndMinute); Button(role:.destructive) { reminderTimes.remove(at:i) } label: { Image(systemName:"minus.circle") }.buttonStyle(.borderless) } }
                     if reminderTimes.count < 10 { Button { reminderTimes.append(Calendar.current.date(bySettingHour:9,minute:0,second:0,of:Date())!) } label: { Label("Añadir recordatorio",systemImage:"plus") } }
                     Toggle("Abrir nota al completar",isOn:$draft.memoAfter)
@@ -55,7 +58,7 @@ struct HabitEditor: View {
                 }
             }.scrollContentBackground(.hidden).background(draft.tint.opacity(0.07)).navigationTitle("\(draft.icon) \(draft.name.isEmpty ? "Hábito personalizado" : draft.name)").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement:.principal) { Text("\(draft.icon) \(draft.name.isEmpty ? "Personalizado" : draft.name)").font(.subheadline.weight(.semibold)).lineLimit(1).minimumScaleFactor(0.7) }; ToolbarItem(placement:.cancellationAction) { Button("Cancelar") { dismiss() } }; ToolbarItem(placement:.confirmationAction) { Button(authorizing ? "Guardando…" : "Guardar") { save() }.fontWeight(.semibold).disabled(authorizing) } }
-            .onAppear { guard !initializedHealth else { return }; initializedHealth = true; if let source = store.healthConfiguration.sources[draft.id] ?? suggestedHealth { healthEnabled = true; healthSourceID = source; if let data = HealthSource.all.first(where:{$0.id == source}) { draft.unit = data.unit } } }
+            .onAppear { guard !initializedHealth else { return }; initializedHealth = true; superAlert = UserDefaults.standard.bool(forKey:"repeat.superAlert."+draft.id); if let source = store.healthConfiguration.sources[draft.id] ?? suggestedHealth { healthEnabled = true; healthSourceID = source; if let data = HealthSource.all.first(where:{$0.id == source}) { draft.unit = data.unit } } }
             .onChange(of:healthSourceID) { _,id in if healthEnabled,let source = HealthSource.all.first(where:{$0.id == id}) { draft.unit = source.unit } }
             .alert("Revisa tu hábito",isPresented:Binding(get:{validation != nil},set:{if !$0 { validation = nil }})) { Button("Aceptar") {} } message: { Text(validation ?? "") }
         }
@@ -99,7 +102,7 @@ struct HabitEditor: View {
         commit()
     }
     func commit() {
-        store.storeHabit(draft); store.configureHealth(draft,source:healthEnabled ? healthSourceID : nil)
+        UserDefaults.standard.set(superAlert,forKey:"repeat.superAlert."+draft.id); store.storeHabit(draft); store.configureHealth(draft,source:healthEnabled ? healthSourceID : nil)
         if !draft.reminders.isEmpty { Task { let center = UNUserNotificationCenter.current(); let s = await center.notificationSettings(); if s.authorizationStatus == .notDetermined { _ = try? await center.requestAuthorization(options:[.alert,.sound,.badge]) }; await store.scheduleReminders() } }
         dismiss()
     }
