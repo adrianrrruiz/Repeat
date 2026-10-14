@@ -27,5 +27,10 @@ test('API: ocho hábitos, persistencia, concurrencia, reintentos y aislamiento',
  assert.equal((await post(a,{op:'mood',date:dateKey(),mood:4,note:'Prueba'})).data.moods[0].mood,4);
  assert.equal((await get(b)).entries.length,0);
  const latest=await get(a);assert.equal(latest.habits.length,8);assert.equal(latest.entries[0].note,'Nota de prueba');
+ const deletion={op:'delete',id:hs[0].id,requestId:crypto.randomUUID()};
+ assert.equal((await post(b,deletion)).status,404,'otro usuario no puede eliminar el hábito');
+ assert.equal((await post(a,deletion)).status,200);
+ assert.equal((await post(a,deletion)).status,200,'reintento de eliminar no bloquea la cola');
+ const afterDelete=await get(a);assert.equal(afterDelete.habits.length,7);assert.equal(afterDelete.entries.length,0);
  console.log('Verificado: 8 hábitos; registros conservados; operaciones concurrentes; reintentos únicos; autorización y validación. Datos de prueba en usuarios QA locales.');
 });

@@ -56,3 +56,8 @@ next-env.d.ts
 /work/
 
 *.tsbuildinfo
+
+# Native iOS builds
+/ios/build/
+**/xcuserdata/
+*.xcuserstate

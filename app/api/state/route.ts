@@ -23,15 +23,17 @@ export async function POST(request:Request){
  if(Number(request.headers.get('content-length')||0)>20000)return response({error:'Solicitud demasiado grande.'},413);
  let body:unknown;try{const raw=await request.text();if(raw.length>20000)return response({error:'Solicitud demasiado grande.'},413);body=JSON.parse(raw);}catch{return response({error:'Solicitud inválida.'},400);}
  const parsed=mutationSchema.safeParse(body);if(!parsed.success)return response({error:parsed.error.issues[0]?.message||'Revisa los datos.'},400);
- const m=parsed.data;const rid=z.string().uuid().safeParse(body && typeof body==='object' ? (body as {requestId?:unknown}).requestId : undefined);if(m.op==='entry'&&m.mode==='increment'&&!rid.success)return response({error:'Identificador de registro inválido.'},400);const db=env.DB; if(!db)return response({error:'La sincronización no está disponible.'},503);
+ const m=parsed.data;const rid=z.string().uuid().safeParse(body && typeof body==='object' ? (body as {requestId?:unknown}).requestId : undefined);if(((m.op==='entry'&&m.mode==='increment')||m.op==='delete')&&!rid.success)return response({error:'Identificador de registro inválido.'},400);const db=env.DB; if(!db)return response({error:'La sincronización no está disponible.'},503);
  const uid=user.userId,now=new Date().toISOString();
  try{
   if(m.op==='habit')await db.prepare('INSERT INTO habits(user_id,id,content,updated_at) VALUES(?,?,?,?) ON CONFLICT(user_id,id) DO UPDATE SET content=excluded.content,updated_at=excluded.updated_at').bind(uid,m.habit.id,JSON.stringify(m.habit),now).run();
   else if(m.op==='mood')await db.prepare('INSERT INTO moods(user_id,date,mood,note) VALUES(?,?,?,?) ON CONFLICT(user_id,date) DO UPDATE SET mood=excluded.mood,note=excluded.note').bind(uid,m.date,m.mood,m.note).run();
   else{
+   if(m.op==='delete'&&rid.success){const receipt=await db.prepare('SELECT request_id FROM operation_receipts WHERE user_id=? AND request_id=?').bind(uid,rid.data).first();if(receipt)return response(await snapshot(uid));}
    const row=await db.prepare('SELECT content FROM habits WHERE user_id=? AND id=?').bind(uid,m.id).first<{content:string}>();if(!row)return response({error:'No encontramos ese hábito.'},404);
    const h=JSON.parse(row.content) as Habit;
-   if(m.op==='archive'){h.archived=m.archived;await db.prepare('UPDATE habits SET content=?,updated_at=? WHERE user_id=? AND id=?').bind(JSON.stringify(h),now,uid,m.id).run();}
+   if(m.op==='delete'){if(!rid.success)return response({error:'Identificador inválido.'},400);await db.batch([db.prepare('DELETE FROM entries WHERE user_id=? AND habit_id=?').bind(uid,m.id),db.prepare('DELETE FROM habits WHERE user_id=? AND id=?').bind(uid,m.id),db.prepare('INSERT OR IGNORE INTO operation_receipts(user_id,request_id,created_at) VALUES(?,?,?)').bind(uid,rid.data,now)]);}
+   else if(m.op==='archive'){h.archived=m.archived;await db.prepare('UPDATE habits SET content=?,updated_at=? WHERE user_id=? AND id=?').bind(JSON.stringify(h),now,uid,m.id).run();}
    else{
     if(m.mode==='clear')await db.prepare('UPDATE entries SET value=0,checked=0 WHERE user_id=? AND habit_id=? AND date=?').bind(uid,m.id,m.date).run();
     else if(m.mode==='note')await db.prepare('INSERT INTO entries(user_id,habit_id,date,note,mood,updated_at) VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,habit_id,date) DO UPDATE SET note=excluded.note,mood=excluded.mood,updated_at=excluded.updated_at').bind(uid,m.id,m.date,m.note??'',m.mood??null,now).run();

@@ -13,6 +13,10 @@ Inspección mediante Computer / iPhone Mirroring el 13 de octubre de 2026. No se
 - Social: compartir hábitos requiere iCloud y notificaciones. Fuera del alcance personal.
 - Ajustes: gestor de hábitos/grupos, tema, backup, exportación, idioma, opciones semanales. Perfil muestra estado de ánimo y citas.
 
-El botón de creación está bloqueado por la oferta Pro debido al límite actual de cinco hábitos. El formulario de edición fue la referencia disponible, no se observó directamente el flujo inicial completo de creación. El desplazamiento remoto no permitió leer todos los ajustes inferiores.
+## Creación observada después de liberar un hábito
 
-Repeat reproduce el flujo personal con código e identidad propios, no usa activos del proveedor. La primera versión no integra Apple Health, widgets, Dynamic Island, grupos sociales ni notificaciones cuando está cerrada. Recordatorios en pantalla cuando está abierta. Datos sincronizados con D1 y acceso privado de Sites.
+El catálogo muestra categorías Popular, Health y Sports, filas con emoji, nombre, distintivo de Apple Health y botón +, además del botón flotante Custom Habit. Se observaron Walk, Sleep, Drink water, Meditation, Run, Stand, Cycling, Workout y calorías. El corazón indica Salud, no favoritos.
+
+Custom Habit abre nombre vacío, descripción, emoji, color menta, grupo, construir/dejar, Health apagado, periodo diario, 1 count/día, todos los días, franja Anytime, recordatorios apagados y memo tras completar encendido. Walk abre nombre e icono predefinidos, azul, Health encendido y 10000 pasos diarios. No se guardó ninguno. El desplazamiento remoto no permitió leer con fiabilidad toda la parte inferior.
+
+Repeat 1.1 reproduce ese catálogo y formulario con identidad y código propios. Integra Salud de solo lectura, widgets, Actividad en Vivo, bloqueo, rachas, gestión, restauración JSON y exportación CSV. El historial de Salud permanece en el teléfono y no se envía a Sites. Compartir, competir y grupos sociales quedan fuera del uso personal. Super Alert y el medidor propietario de estrés no se han reproducido.

@@ -28,6 +28,7 @@ export type Snapshot = {habits:Habit[];entries:Entry[];moods:Mood[]};
 export const mutationSchema = z.discriminatedUnion('op',[
  z.object({op:z.literal('habit'),habit:habitSchema}),
  z.object({op:z.literal('archive'),id:idSchema,archived:z.boolean()}),
+ z.object({op:z.literal('delete'),id:idSchema}),
  z.object({op:z.literal('entry'),id:idSchema,date:daySchema,mode:z.enum(['increment','set','check','clear','note']),value:z.number().finite().min(-1000000000).max(1000000000).optional(),checked:z.boolean().optional(),note:z.string().max(5000).optional(),mood:z.number().int().min(1).max(5).nullable().optional()}),
  z.object({op:z.literal('mood'),date:daySchema,mood:z.number().int().min(1).max(5),note:z.string().max(5000)})
 ]);
