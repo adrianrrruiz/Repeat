@@ -63,3 +63,21 @@ let skipped = completed + [Entry(habitId:daily.id,date:"2026-10-13",skipped:true
 check(metrics(daily,skipped,today:"2026-10-14").current == 3,"Saltar un día conserva la racha anterior")
 check(rangeTotals([daily],skipped,start:"2026-10-10",end:"2026-10-13").0 == 3,"Un día saltado no cuenta como fallo")
 print("5 comprobaciones de persistencia completa, fallo de disco y días saltados: correctas")
+var meditation = Habit(); meditation.name = "Meditación"; meditation.goal = 5; meditation.unit = "min"
+let meditationDate = "2026-10-14"
+let imported = Entry(habitId:meditation.id,date:meditationDate,value:2)
+var healthConfig = HealthConfiguration(sources:[meditation.id:"mindful"],entries:[imported])
+let note = Entry(habitId:meditation.id,date:meditationDate,note:"Nota preservada")
+healthConfig.corrections = [imported.id:3.5]
+let corrected = healthConfig.combinedEntries(manual:[note])
+check(corrected.first?.value == 3.5,"Corrige minutos de atención plena en Repeat")
+check(corrected.first?.note == note.note,"La corrección conserva la nota")
+check(healthConfig.entries.first?.value == 2,"La lectura original de Salud permanece intacta")
+check(meditation.progress(meditationDate,corrected).ratio == 0.7,"El progreso refleja el 70 por ciento")
+healthConfig.entries[0].value = 5
+check(healthConfig.combinedEntries(manual:[note]).first?.value == 3.5,"Actualizar Salud respeta la corrección")
+healthConfig.corrections = nil
+check(healthConfig.combinedEntries(manual:[note]).first?.value == 5,"Retirar corrección recupera el tiempo de Salud")
+let oldHealth = try JSONDecoder().decode(HealthConfiguration.self,from:Data("{\"sources\":{},\"entries\":[],\"showOnWidgets\":false}".utf8))
+check(oldHealth.corrections == nil,"Configuración anterior compatible")
+print("7 comprobaciones de corrección de meditación y progreso parcial: correctas")

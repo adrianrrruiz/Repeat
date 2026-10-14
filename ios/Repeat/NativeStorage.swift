@@ -33,4 +33,17 @@ struct HealthConfiguration: Codable {
     var sources: [String:String] = [:]
     var entries: [Entry] = []
     var showOnWidgets = false
+    var corrections:[String:Double]? = nil
+    func combinedEntries(manual:[Entry]) -> [Entry] {
+        let automatic = entries.filter{sources[$0.habitId] != nil}
+        var combined = manual.filter { e in sources[e.habitId] == nil || !automatic.contains(where:{$0.id == e.id}) }.map { e in var result = e; if sources[e.habitId] != nil { result.value = 0; result.checked = false }; return result }
+        combined += automatic.map { e in var result = e; if let note = manual.first(where:{$0.id == e.id}) { result.note = note.note; result.mood = note.mood; result.skipped = note.skipped }; return result }
+        for (key,value) in corrections ?? [:] {
+            let parts = key.split(separator:":",maxSplits:1).map(String.init)
+            guard parts.count == 2,sources[parts[0]] != nil else { continue }
+            if let index = combined.firstIndex(where:{$0.id == key}) { combined[index].value = value; combined[index].checked = false }
+            else { combined.append(Entry(habitId:parts[0],date:parts[1],value:value)) }
+        }
+        return combined
+    }
 }

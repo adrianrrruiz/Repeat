@@ -89,14 +89,12 @@ struct ReportsView: View {
 struct SettingsView: View {
     @EnvironmentObject var store:HabitStore
     @State private var connection = false
-    @State private var mood = false
     @AppStorage("repeat.lockEnabled") private var lockEnabled = false
     @AppStorage("repeat.personalQuote") private var quote = ""
     var body:some View {
         NavigationStack {
             Form {
                 Section { HStack(spacing:16) { Text("🙂").font(.system(size:43)); VStack(alignment:.leading,spacing:5) { Text("Mi espacio").font(.title2.weight(.semibold)); Text("Hábitos sin límites").font(.caption).foregroundStyle(Color.repeatPink) } }.padding(.vertical,12) }
-                Section("Cómo te has sentido") { moodWeek; Button("Registrar estado de ánimo") { mood = true } }
                 Section("Frase diaria") { NavigationLink { DailyQuoteView() } label: { Text(quote.isEmpty ? DailyQuoteView.quotes[Calendar.current.ordinality(of:.day,in:.year,for:Date())! % DailyQuoteView.quotes.count] : quote).font(.headline).foregroundStyle(Color.repeatPink).padding(.vertical,20) } }
                 Section("Tu rutina") { NavigationLink("Gestionar hábitos") { HabitManagerView() }; NavigationLink("Gestionar grupos") { GroupManagerView() }; NavigationLink("Apariencia") { AppearanceView() }; NavigationLink("Copia y exportación") { BackupView() }; NavigationLink("Apple Health") { HealthSettingsView() } }
                 Section("Sincronización") { Button { connection = true } label: { Label(store.connected ? "Cuenta conectada" : "Conectar con el computador",systemImage:"icloud") }; HStack { Text(store.syncText).font(.caption).foregroundStyle(.secondary); Spacer(); if store.syncing { SwiftUI.ProgressView() } else if store.connected { Button { Task { await store.sync() } } label: { Image(systemName:"arrow.clockwise") } } }; if !store.state.queue.isEmpty { Text("\(store.state.queue.count) cambios pendientes de sincronizar").font(.caption).foregroundStyle(.secondary) } }
@@ -104,11 +102,7 @@ struct SettingsView: View {
                 Section("Widgets y temporizador") { Text("Añade el widget de Repeat desde la pantalla de inicio o bloqueo del iPhone. Los widgets muestran tus metas y permiten registrarlas. El temporizador aparece en la pantalla bloqueada y Dynamic Island cuando las Actividades en Vivo están permitidas.").font(.footnote).foregroundStyle(.secondary) }
             }.navigationTitle("Mi espacio").navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented:$connection) { ConnectionView() }
-            .sheet(isPresented:$mood) { MoodEditor(date:Day.key(Date())) }
         }
-    }
-    var moodWeek:some View {
-        HStack { ForEach(0..<7,id:\.self) { i in let key = Day.shift(Day.weekStart(Day.key(Date())),i); let record = store.state.snapshot.moods.first{$0.date == key}; VStack(spacing:10) { Text(["L","M","X","J","V","S","D"][i]).font(.caption2); Text(record.map{["😭","🙁","😐","🙂","😄"][$0.mood-1]} ?? "\(Calendar.current.component(.day,from:Day.date(key)))").font(.callout).frame(maxWidth:.infinity).padding(.vertical,8).background(Color.repeatPink.opacity(0.06),in:Circle()) } } }
     }
 }
 struct HistorySelection:Identifiable { var date:String; var id:String { date } }

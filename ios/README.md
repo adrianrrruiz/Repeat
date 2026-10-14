@@ -67,3 +67,11 @@ ios/build/model-tests
 - Se comprobaron las acciones nativas Añadir, Saltar, Ocultar, Mostrar y el diálogo de eliminación en el simulador. El gesto físico de arrastre del control remoto en Simulator produjo un toque; queda por verificar el deslizamiento real en el iPhone actualizado.
 
 La versión 1.3 elimina la confirmación visual Hábito guardado y las filas Continuar. El botón Actualizar Salud también permite solicitar o revisar el permiso del tipo conectado.
+
+## Versión 1.4
+
+- La navegación inferior muestra solo iconos. El registro de ánimo se retira de Hoy, Mi espacio y notas, conservando los datos antiguos.
+- Cada tarjeta se rellena horizontalmente según su porcentaje real. El texto mantiene contraste sobre ambas zonas.
+- Meditación conectada a Salud permite corregir el tiempo registrado del día en Repeat. La corrección se guarda localmente, sobrevive a refrescar Salud y puede retirarse con Usar tiempo de Apple Health. No modifica muestras de HealthKit.
+- Verificado desde la interfaz del simulador: cambiar 2,5 a 4 minutos, persistencia de la corrección y lectura original intacta. Inspección de tarjetas al 0, 40, 60 y 100 %, navbar sin textos y ausencia del registro de ánimo.
+- Siete comprobaciones adicionales cubren correcciones, notas, refresco, restauración del valor original y compatibilidad de configuración.

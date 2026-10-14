@@ -13,11 +13,11 @@ struct RootView: View {
     private let tick = Timer.publish(every:15,on:.main,in:.common).autoconnect()
     var body: some View {
         TabView(selection:$tab) {
-            TodayView(group:$group).tabItem { Label("Hoy",systemImage:"house.fill") }.tag(0)
-            OverviewView().tabItem { Label("Progreso",systemImage:"chart.bar.fill") }.tag(1)
-            GroupsView { selected in group = selected; tab = 0 }.tabItem { Label("Grupos",systemImage:"folder.fill") }.tag(2)
-            ReportsView().tabItem { Label("Informes",systemImage:"list.bullet.clipboard.fill") }.tag(3)
-            SettingsView().tabItem { Label("Mi espacio",systemImage:"gearshape.fill") }.tag(4)
+            TodayView(group:$group).tabItem { Image(systemName:"house.fill").accessibilityLabel("Hoy") }.tag(0)
+            OverviewView().tabItem { Image(systemName:"chart.bar.fill").accessibilityLabel("Progreso") }.tag(1)
+            GroupsView { selected in group = selected; tab = 0 }.tabItem { Image(systemName:"folder.fill").accessibilityLabel("Grupos") }.tag(2)
+            ReportsView().tabItem { Image(systemName:"list.bullet.clipboard.fill").accessibilityLabel("Informes") }.tag(3)
+            SettingsView().tabItem { Image(systemName:"gearshape.fill").accessibilityLabel("Mi espacio") }.tag(4)
         }
         .preferredColorScheme(theme == "dark" ? .dark : theme == "light" ? .light : nil)
         .accessibilityHidden(lockEnabled && !unlocked)
@@ -43,7 +43,6 @@ struct TodayView: View {
     @State private var deleting:Habit? = nil
     @State private var showExcluded = false
     @State private var selected: Habit? = nil
-    @State private var mood = false
     @AppStorage("repeat.weekMode") private var weekMode = "week"
     @AppStorage("repeat.showStreaks") private var showStreaks = true
     var scheduled:[Habit] { store.active.filter { (group.isEmpty || $0.group == group) && $0.scheduled(date) } }
@@ -94,13 +93,12 @@ struct TodayView: View {
             }.listStyle(.plain).scrollContentBackground(.hidden).navigationTitle("Hoy").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement:.topBarLeading) { Menu { Button("Todos") { group = "" }; ForEach(store.groups,id:\.self) { g in Button(g) { group = g } } } label: { HStack { Text(group.isEmpty ? "Todos" : group); Image(systemName:"chevron.down").font(.system(size:9)) }.font(.caption).foregroundStyle(.white).padding(.horizontal,12).padding(.vertical,5).background(Color.repeatPink,in:Capsule()) } }
-                ToolbarItemGroup(placement:.topBarTrailing) { Button { mood = true } label: { Text("🙂") }; Button { catalog = true } label: { Image(systemName:"plus.circle.fill") } }
+                ToolbarItemGroup(placement:.topBarTrailing) { Button { catalog = true } label: { Image(systemName:"plus.circle.fill") } }
             }
             .sheet(isPresented:$catalog) { HabitCatalog() }
             .sheet(item:$editing) { HabitEditor(initial:$0) }
             .confirmationDialog("Eliminar este hábito y sus registros",isPresented:Binding(get:{deleting != nil},set:{if !$0 { deleting = nil }}),titleVisibility:.visible) { Button("Eliminar definitivamente",role:.destructive) { if let deleting { store.delete(deleting) }; deleting = nil }; Button("Cancelar",role:.cancel) { deleting = nil } } message: { Text("Esta acción no se puede deshacer. Puedes archivar el hábito para conservar su historial.") }
             .sheet(item:$selected) { HabitDetail(original:$0,date:date) }
-            .sheet(isPresented:$mood) { MoodEditor(date:date) }
             .task(id:date) { await store.refreshHealth(date:date) }
             .safeAreaInset(edge:.bottom) { if let f = store.focus { FocusBanner(focus:f) } }
         }
@@ -114,6 +112,15 @@ struct HabitCard: View {
     var body: some View {
         let p = habit.progress(date,store.entries)
         let streak = metrics(habit,store.entries)
+        content(p,streak).padding(18)
+            .foregroundStyle(Color.primary)
+            .background { GeometryReader { geometry in
+                ZStack(alignment:.leading) { Rectangle().fill(habit.tint.opacity(0.09)); Rectangle().fill(habit.tint.opacity(0.9)).frame(width:geometry.size.width * p.ratio) }
+            } }
+            .overlay { content(p,streak).padding(18).foregroundStyle(Color.black.opacity(0.8)).mask { GeometryReader { geometry in Rectangle().frame(width:geometry.size.width * p.ratio).frame(maxWidth:.infinity,alignment:.leading) } }.allowsHitTesting(false).accessibilityHidden(true) }
+            .clipShape(RoundedRectangle(cornerRadius:16))
+    }
+    func content(_ p:Progress,_ streak:HabitMetrics) -> some View {
         HStack(spacing:12) {
             Button(action:open) {
                 HStack(spacing:13) {
@@ -124,7 +131,7 @@ struct HabitCard: View {
                 }.contentShape(Rectangle())
             }.buttonStyle(.plain)
             Button(action:p.done || store.healthSource(habit.id) != nil ? open : complete) { Image(systemName:p.done ? "checkmark" : "plus").font(.system(size:12)).frame(width:27,height:27).background(.white.opacity(p.done ? 0.3 : 0.7),in:Circle()) }.buttonStyle(.plain).accessibilityLabel(p.done ? "Ver registro de \(habit.name)" : "Completar \(habit.name)")
-        }.padding(18).foregroundStyle(p.done ? Color.black.opacity(0.8) : .primary).background(habit.tint.opacity(p.done ? 0.9 : 0.09),in:RoundedRectangle(cornerRadius:16))
+        }
     }
 }
 struct HabitDetail: View {
@@ -138,6 +145,7 @@ struct HabitDetail: View {
     @State private var stats = false
     @State private var countdown = true
     @State private var deleting = false
+    @State private var correctionError:String? = nil
     var habit: Habit { store.state.snapshot.habits.first { $0.id == original.id } ?? original }
     var body: some View {
         let h = habit; let p = h.progress(date,store.entries)
@@ -159,6 +167,16 @@ struct HabitDetail: View {
                         HStack { TextField("Cantidad",text:$amount).keyboardType(.decimalPad).padding(13).background(Color(.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:16)); Button(correcting ? "Guardar" : "Añadir") { log(h) }.buttonStyle(.borderedProminent).disabled(value == nil || value! < (correcting ? 0 : 0.000001)) }
                         Button(correcting ? "Volver a añadir" : "Corregir valor del día") { correcting.toggle(); amount = correcting ? String(store.entry(h,date)?.value ?? 0) : "1" }.font(.caption)
                     } } else { Label("Apple Health · Solo en este iPhone",systemImage:"heart.fill").font(.footnote).foregroundStyle(.secondary); Button("Actualizar Salud") { Task { do { if let source = store.healthSource(h.id) { try await store.health.request(source) }; await store.refreshHealth(date:date) } catch { store.error = error.localizedDescription } } }.disabled(store.readingHealth) }
+                    if store.healthSource(h.id)?.id == "mindful" {
+                        VStack(alignment:.leading,spacing:12) {
+                            if correcting {
+                                Text("Tiempo registrado del día (min)").font(.caption).foregroundStyle(.secondary)
+                                HStack { TextField("Minutos",text:$amount).keyboardType(.decimalPad).padding(13).background(Color(.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:16)); Button("Guardar") { log(h) }.buttonStyle(.borderedProminent).disabled(value == nil || value! < 0) }
+                            }
+                            Button(correcting ? "Cancelar corrección" : "Corregir tiempo registrado") { correcting.toggle(); amount = String(store.entry(h,date)?.value ?? 0) }
+                            if store.hasHealthCorrection(h,date) { Text("Tiempo corregido en Repeat").font(.caption).foregroundStyle(.secondary); Button("Usar tiempo de Apple Health") { if !store.correctHealth(h,date,value:nil) { correctionError = store.error; store.error = nil } } }
+                        }.font(.subheadline)
+                    }
                     Button { store.complete(h,date); if h.memoAfter { memo = true } } label: { Label(h.type == "quit" ? (p.done ? "Retirar confirmación" : "Confirmar dentro del límite") : p.done ? "Meta completada" : "Completar meta",systemImage:"checkmark").frame(maxWidth:.infinity).padding(11) }.buttonStyle(.borderedProminent).tint(h.tint).disabled(store.healthSource(h.id) != nil || (h.type == "build" ? p.done : !p.done && p.value > h.goal))
                     if let entry = store.entry(h,date),entry.value > 0 || entry.checked { Button("Restablecer progreso del día") { store.mutate(Operation(op:"entry",id:h.id,date:date,mode:"clear")) }.font(.caption2).foregroundStyle(.secondary).disabled(store.focus?.habitId == h.id || store.healthSource(h.id) != nil) }
                     if let e = store.entry(h,date),!e.note.isEmpty { Text(e.note).font(.subheadline).frame(maxWidth:.infinity,alignment:.leading).padding().background(Color(.secondarySystemGroupedBackground),in:RoundedRectangle(cornerRadius:18)) }
@@ -167,13 +185,14 @@ struct HabitDetail: View {
             }.background(Color(.systemGroupedBackground)).navigationTitle("\(h.icon) \(h.name)").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement:.cancellationAction) { Button("Cerrar") { dismiss() } }; ToolbarItem(placement:.primaryAction) { Menu { Button("Editar",systemImage:"pencil") { editor = true }; Button("Eliminar hábito",systemImage:"trash",role:.destructive) { deleting = true } } label: { Image(systemName:"ellipsis") }.disabled(store.focus?.habitId == h.id) } }
             .confirmationDialog("Eliminar \(h.name)",isPresented:$deleting,titleVisibility:.visible) { Button("Eliminar hábito y sus registros",role:.destructive) { if store.delete(h) { dismiss() } }; Button("Cancelar",role:.cancel) {} } message: { Text("Esta acción no se puede deshacer.") }
+            .alert("No se pudo guardar el tiempo",isPresented:Binding(get:{correctionError != nil},set:{if !$0 { correctionError = nil }})) { Button("Aceptar") {} } message: { Text(correctionError ?? "") }
             .sheet(isPresented:$editor) { HabitEditor(initial:h) }
             .sheet(isPresented:$memo) { MemoEditor(habit:h,date:date) }
             .sheet(isPresented:$stats) { OverviewView(habit:h) }
         }
     }
     var value: Double? { guard let v = Double(amount.replacingOccurrences(of:",",with:".")),v.isFinite,v <= 1e9 else { return nil }; return v }
-    func log(_ h: Habit) { guard let value else { return }; if correcting { store.mutate(Operation(op:"entry",id:h.id,date:date,mode:"set",value:value)) } else { store.add(h,date,value) }; if h.memoAfter && h.progress(date,store.entries).done { memo = true } }
+    func log(_ h: Habit) { guard let value else { return }; if store.healthSource(h.id)?.id == "mindful" { if store.correctHealth(h,date,value:value) { correcting = false } else { correctionError = store.error; store.error = nil }; return }; if correcting { store.mutate(Operation(op:"entry",id:h.id,date:date,mode:"set",value:value)) } else { store.add(h,date,value) }; if h.memoAfter && h.progress(date,store.entries).done { memo = true } }
 }
 struct FocusBanner: View {
     @EnvironmentObject var store: HabitStore
@@ -192,17 +211,5 @@ struct MemoEditor: View {
     var habit: Habit; var date: String
     @State private var note = ""
     @State private var mood: Int? = nil
-    var body: some View { NavigationStack { Form { Section(habit.name) { TextEditor(text:$note).frame(minHeight:180); MoodChoices(selected:Binding(get:{mood ?? 0},set:{mood = $0 == 0 ? nil : $0})) } }.navigationTitle("Tu nota").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement:.cancellationAction) { Button("Cancelar") { dismiss() } }; ToolbarItem(placement:.confirmationAction) { Button("Guardar") { store.mutate(Operation(op:"entry",id:habit.id,date:date,mode:"note",note:limitedText(note,5000),mood:mood)); dismiss() } } }.onAppear { let e = store.entry(habit,date); note = e?.note ?? ""; mood = e?.mood } } }
-}
-struct MoodChoices: View {
-    @Binding var selected: Int
-    var body: some View { HStack { ForEach(1...5,id:\.self) { n in Button { selected = n } label: { Text(["😭","🙁","😐","🙂","😄"][n-1]).font(.system(size:30)).frame(maxWidth:.infinity).padding(.vertical,9).background(selected == n ? Color.repeatPink.opacity(0.12) : .clear,in:RoundedRectangle(cornerRadius:13)) }.buttonStyle(.plain).accessibilityLabel(["Muy mal","Mal","Neutral","Bien","Muy bien"][n-1]) } } }
-}
-struct MoodEditor: View {
-    @EnvironmentObject var store: HabitStore
-    @Environment(\.dismiss) var dismiss
-    var date: String
-    @State private var selected = 4
-    @State private var note = ""
-    var body: some View { NavigationStack { Form { Section(Day.date(date).formatted(date:.long,time:.omitted)) { MoodChoices(selected:$selected); TextEditor(text:$note).frame(minHeight:150) } }.navigationTitle("¿Cómo te sientes?").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement:.cancellationAction) { Button("Cancelar") { dismiss() } }; ToolbarItem(placement:.confirmationAction) { Button("Guardar") { store.mutate(Operation(op:"mood",date:date,note:limitedText(note,5000),mood:selected)); dismiss() } } }.onAppear { if let m = store.state.snapshot.moods.first(where:{$0.date == date}) { selected = m.mood; note = m.note } } } }
+    var body: some View { NavigationStack { Form { Section(habit.name) { TextEditor(text:$note).frame(minHeight:180) } }.navigationTitle("Tu nota").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement:.cancellationAction) { Button("Cancelar") { dismiss() } }; ToolbarItem(placement:.confirmationAction) { Button("Guardar") { store.mutate(Operation(op:"entry",id:habit.id,date:date,mode:"note",note:limitedText(note,5000),mood:mood)); dismiss() } } }.onAppear { let e = store.entry(habit,date); note = e?.note ?? ""; mood = e?.mood } } }
 }

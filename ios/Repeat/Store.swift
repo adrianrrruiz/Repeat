@@ -18,11 +18,7 @@ final class HabitStore: ObservableObject {
     let health = HealthIntegration()
     private var schedulingReminders = false
     private var remindersNeedRefresh = false
-    var entries:[Entry] {
-        let automatic = healthConfiguration.entries.filter{healthConfiguration.sources[$0.habitId] != nil}
-        let manual = state.snapshot.entries.filter { e in healthConfiguration.sources[e.habitId] == nil || !automatic.contains(where:{$0.id == e.id}) }.map { e in var result = e; if healthConfiguration.sources[e.habitId] != nil { result.value = 0; result.checked = false }; return result }
-        return manual + automatic.map { e in var result = e; if let note = state.snapshot.entries.first(where:{$0.id == e.id}) { result.note = note.note; result.mood = note.mood; result.skipped = note.skipped }; return result }
-    }
+    var entries:[Entry] { healthConfiguration.combinedEntries(manual:state.snapshot.entries) }
     static let origin = "https://repeat-habitos-personal.freevenus7.chatgpt.site"
     let site = URL(string:origin)!
     private let file: URL
@@ -149,14 +145,21 @@ final class HabitStore: ObservableObject {
         let current = payload.forDay(date); payload.habits = current.habits; payload.completion = current.completion
         if NativeStorage.writeWidget(payload) { WidgetCenter.shared.reloadAllTimelines() }
     }
-    func saveHealth() {
-        do { try JSONEncoder().encode(healthConfiguration).write(to:URL.documentsDirectory.appending(path:"repeat-health-local.json"),options:[.atomic,.completeFileProtectionUntilFirstUserAuthentication]); publishWidget() }
-        catch { self.error = "No se pudo guardar la configuración de Salud." }
+    @discardableResult func saveHealth() -> Bool {
+        do { try JSONEncoder().encode(healthConfiguration).write(to:URL.documentsDirectory.appending(path:"repeat-health-local.json"),options:[.atomic,.completeFileProtectionUntilFirstUserAuthentication]); publishWidget(); return true }
+        catch { self.error = "No se pudo guardar la configuración de Salud."; return false }
+    }
+    func hasHealthCorrection(_ habit:Habit,_ date:String) -> Bool { healthConfiguration.corrections?[habit.id+":"+date] != nil }
+    @discardableResult func correctHealth(_ habit:Habit,_ date:String,value:Double?) -> Bool {
+        guard healthSource(habit.id)?.id == "mindful",value == nil || (value!.isFinite && value! >= 0 && value! <= 1e9) else { return false }
+        let previous = healthConfiguration
+        var corrections = healthConfiguration.corrections ?? [:]; corrections[habit.id+":"+date] = value; healthConfiguration.corrections = corrections
+        guard saveHealth() else { healthConfiguration = previous; return false }; return true
     }
     func healthSource(_ id:String) -> HealthSource? { HealthSource.all.first { $0.id == healthConfiguration.sources[id] } }
     func configureHealth(_ habit:Habit,source:String?) {
         healthConfiguration.sources[habit.id] = source
-        if source == nil { healthConfiguration.entries.removeAll{$0.habitId == habit.id} }
+        if source == nil { healthConfiguration.entries.removeAll{$0.habitId == habit.id}; healthConfiguration.corrections = healthConfiguration.corrections?.filter{!$0.key.hasPrefix(habit.id+":")} }
         saveHealth()
         if source != nil { Task { await refreshHealth() } }
     }
