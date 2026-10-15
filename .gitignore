@@ -70,3 +70,5 @@ repeat-health-local.json
 /ios/build/
 **/xcuserdata/
 *.xcuserstate
+
+/ios/build-icloud-probe/

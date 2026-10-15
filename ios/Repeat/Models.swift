@@ -128,7 +128,8 @@ struct Operation: Codable, Identifiable {
     var mood: Int? = nil
     var archived: Bool? = nil
 }
-struct SavedState: Codable { var snapshot = Snapshot(); var queue: [Operation] = [] }
+struct CloudLink: Codable { var accountID:String; var epoch:String; var lastSync:Date }
+struct SavedState: Codable { var snapshot = Snapshot(); var queue: [Operation] = []; var cloud:CloudLink? = nil }
 struct FocusSession: Codable { var habitId: String; var date: String; var start: Date; var seconds: Double; var countdown: Bool; var requestId = UUID().uuidString.lowercased(); var unit:String? = nil }
 
 enum Day {
@@ -142,4 +143,29 @@ func number(_ value: Double) -> String { value.formatted(.number.locale(Locale(i
 extension Color {
     init(hex: String) { let n = UInt32(hex.trimmingCharacters(in:CharacterSet(charactersIn:"#")),radix:16) ?? 0xFF5B86; self.init(red:Double((n>>16)&255)/255,green:Double((n>>8)&255)/255,blue:Double(n&255)/255) }
     static let repeatPink = Color(hex:"#FF5B86")
+}
+
+// Shared reducer: local edits and private-cloud reconciliation use identical rules.
+extension Snapshot {
+    mutating func apply(_ m: Operation) {
+        if m.op == "delete",let id = m.id { habits.removeAll{$0.id == id}; entries.removeAll{$0.habitId == id} }
+        else if m.op == "habit", let h = m.habit { if let i = habits.firstIndex(where:{$0.id == h.id}) { habits[i] = h } else { habits.append(h) } }
+        else if m.op == "archive", let id = m.id, let i = habits.firstIndex(where:{$0.id == id}) { habits[i].archived = m.archived ?? true }
+        else if m.op == "mood", let date = m.date, let mood = m.mood { moods.removeAll { $0.date == date }; moods.append(Mood(date:date,mood:mood,note:m.note ?? "")) }
+        else if m.op == "entry", let id = m.id, let date = m.date {
+            let i = entries.firstIndex { $0.habitId == id && $0.date == date }
+            var e = i.map { entries[$0] } ?? Entry(habitId:id,date:date)
+            switch m.mode {
+            case "skip": e.skipped = m.checked ?? true
+            case "increment": e.skipped = false; e.value = min(1e9,max(0,e.value + (m.value ?? 0))); e.checked = false
+            case "set": e.skipped = false; e.value = max(0,m.value ?? 0); e.checked = false
+            case "check": e.skipped = false; e.checked = m.checked ?? true
+            case "clear": e.skipped = false; e.value = 0; e.checked = false
+            case "note": e.note = m.note ?? ""; e.mood = m.mood
+            default: break
+            }
+            e.updatedAt = ISO8601DateFormatter().string(from:Date())
+            if let i { entries[i] = e } else { entries.append(e) }
+        }
+    }
 }

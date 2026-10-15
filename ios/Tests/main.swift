@@ -132,3 +132,61 @@ check(HabitDayFilter(status:.met,time:.morning).matches(filterHabit,date:filterD
 check(!HabitDayFilter().matches(filterHabit,date:"2026-09-30",entries:[],hour:15),"Filtrar no muestra hábitos anteriores a su inicio")
 check(HabitDayFilter(status:.met).matches(thirty,date:"2026-10-12",entries:[pastReading],hour:15),"El filtro respeta la meta histórica")
 print("12 comprobaciones de filtros combinados, horario y metas históricas: correctas")
+
+// iCloud reconciliation: no network, Apple account or real Health data is used.
+var cloudHabit = reading
+let cloudDay = "2026-10-14"
+let cloudEntry = Entry(habitId:cloudHabit.id,date:cloudDay,value:3,note:"Nota de prueba")
+var offline = SavedState(snapshot:Snapshot(habits:[cloudHabit],entries:[cloudEntry]),queue:[Operation(op:"entry",id:cloudHabit.id,date:cloudDay,mode:"increment",value:3)])
+var replica = CloudReplica()
+replica.incorporate(offline)
+check(replica.snapshot.entries[0].value == 3,"Primer envío no duplica incrementos ya reflejados localmente")
+check(replica.receipts.contains(offline.queue[0].requestId),"El primer envío registra recibos estables")
+offline.cloud = CloudLink(accountID:"synthetic-account",epoch:replica.epoch,lastSync:Date())
+replica.incorporate(offline)
+check(replica.snapshot.entries[0].value == 3,"Reintentar después de fallo local no duplica el envío confirmado")
+let plus = Operation(op:"entry",id:cloudHabit.id,date:cloudDay,mode:"increment",value:2)
+offline.queue = [plus]
+replica.incorporate(offline)
+check(replica.snapshot.entries[0].value == 5,"Aplica una operación nueva sobre el estado remoto")
+replica.incorporate(offline)
+check(replica.snapshot.entries[0].value == 5,"Repetir el mismo identificador es idempotente")
+check(replica.snapshot.entries[0].note == cloudEntry.note,"El incremento conserva la nota")
+var futureCloudHabit = cloudHabit; futureCloudHabit.goal = 50
+futureCloudHabit = futureCloudHabit.preservingMetrics(from:cloudHabit,effectiveDate:"2026-10-20")
+offline.queue = [Operation(op:"habit",habit:futureCloudHabit)]
+replica.incorporate(offline)
+check(replica.snapshot.habits[0].at("2026-10-14").goal == 20 && replica.snapshot.habits[0].at("2026-10-20").goal == 50,"La copia privada conserva versiones de meta")
+offline.queue = [Operation(op:"delete",id:cloudHabit.id)]
+replica.incorporate(offline)
+check(replica.snapshot.habits.isEmpty && replica.snapshot.entries.isEmpty,"El borrado sincronizado elimina hábito y registros")
+offline.queue = []
+replica.incorporate(offline)
+check(replica.snapshot.habits.isEmpty,"Un dispositivo ya vinculado no resucita hábitos eliminados desde su snapshot viejo")
+var remoteOnly = Habit(); remoteOnly.name = "Solo remoto"; remoteOnly.startDate = cloudDay
+replica.snapshot.habits = [remoteOnly]
+offline.cloud = nil
+replica.incorporate(offline)
+check(replica.snapshot.habits.count == 2,"La primera combinación conserva hábitos remotos distintos")
+check(replica.snapshot.entries[0].value == 3,"La combinación inicial conserva el valor local")
+let recoveredReplica = try JSONDecoder().decode(CloudReplica.self,from:JSONEncoder().encode(replica))
+check(recoveredReplica.epoch == replica.epoch && recoveredReplica.receipts == replica.receipts,"Codificación conserva identidad de copia y recibos")
+let oldSavedData = try JSONEncoder().encode(SavedState(snapshot:Snapshot(habits:[cloudHabit])))
+var oldSavedObject = try JSONSerialization.jsonObject(with:oldSavedData) as! [String:Any]
+oldSavedObject.removeValue(forKey:"cloud")
+let oldSaved = try JSONDecoder().decode(SavedState.self,from:JSONSerialization.data(withJSONObject:oldSavedObject))
+check(oldSaved.cloud == nil && oldSaved.snapshot.habits[0].id == cloudHabit.id,"Migra el estado anterior sin cuenta iCloud")
+var atomicCloud = offline
+atomicCloud.cloud = CloudLink(accountID:"synthetic-account",epoch:replica.epoch,lastSync:Date())
+try repository.write(atomicCloud)
+let storedCloud = try repository.read()
+check(storedCloud.cloud?.epoch == replica.epoch && storedCloud.snapshot.habits.count == atomicCloud.snapshot.habits.count,"Estado, cola y vínculo se persisten juntos")
+let portable = String(data:try JSONEncoder().encode(atomicCloud.snapshot),encoding:.utf8)!
+check(!portable.contains("synthetic-account") && !portable.contains("corrections") && !portable.contains("healthConfiguration"),"La copia portable no incluye cuenta ni configuración de Salud")
+print("15 comprobaciones de copia privada, reintentos, historial, borrado y migración: correctas")
+
+var pendingDelete = SavedState(snapshot:Snapshot(),queue:[Operation(op:"delete",id:cloudHabit.id)])
+var oldPrivateCopy = CloudReplica(snapshot:Snapshot(habits:[cloudHabit],entries:[cloudEntry]))
+oldPrivateCopy.incorporate(pendingDelete)
+check(oldPrivateCopy.snapshot.habits.isEmpty && oldPrivateCopy.snapshot.entries.isEmpty,"La primera combinación respeta borrados pendientes del iPhone")
+print("1 comprobación adicional de borrado pendiente al activar: correcta")

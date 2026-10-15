@@ -1,6 +1,5 @@
 import Foundation
 import SwiftUI
-import WebKit
 import UserNotifications
 import WidgetKit
 
@@ -10,7 +9,7 @@ final class HabitStore: ObservableObject {
     @Published var state = SavedState()
     @Published var syncText = "En este iPhone"
     @Published var syncing = false
-    @Published var connected = UserDefaults.standard.bool(forKey:"repeat.connected")
+    @Published var connected = CloudSync.available && UserDefaults.standard.bool(forKey:"repeat.icloud.enabled")
     @Published var error: String? = nil
     @Published var focus: FocusSession? = nil
     @Published var healthConfiguration = HealthConfiguration()
@@ -19,12 +18,10 @@ final class HabitStore: ObservableObject {
     private var schedulingReminders = false
     private var remindersNeedRefresh = false
     var entries:[Entry] { healthConfiguration.combinedEntries(manual:state.snapshot.entries) }
-    static let origin = "https://repeat-habitos-personal.freevenus7.chatgpt.site"
-    let site = URL(string:origin)!
+    let cloud = CloudSync()
     private let file: URL
     private var stopping = false
     private var loadFailure:String? = nil
-    private let redirectGuard = NoRedirect()
     var active: [Habit] { state.snapshot.habits.filter { !$0.archived }.sorted { $0.order < $1.order } }
     var groups: [String] { Array(Set(active.map(\.group).filter { !$0.isEmpty })).sorted() }
     init() {
@@ -39,32 +36,13 @@ final class HabitStore: ObservableObject {
         if let bytes = try? Data(contentsOf:URL.documentsDirectory.appending(path:"repeat-health-local.json")),let config = try? JSONDecoder().decode(HealthConfiguration.self,from:bytes) { healthConfiguration = config }
         if FileManager.default.fileExists(atPath:file.path) { do { state = try StateFile(url:file).read() } catch { loadFailure = error.localizedDescription; self.error = "No se pudo leer el guardado. El archivo se conserva sin modificar." } }
         if let bytes = UserDefaults.standard.data(forKey:"repeat.focus"), let f = try? JSONDecoder().decode(FocusSession.self,from:bytes) { focus = f }
+        syncText = connected ? "Esperando sincronización con iCloud" : "Solo en este iPhone"
     }
     @discardableResult func save() -> Bool {
         guard loadFailure == nil else { error = "No se puede guardar hasta recuperar el archivo anterior. Se conserva sin modificar."; return false }; do { try StateFile(url:file).write(state); publishWidget(); return true }
         catch { self.error = (error as NSError).code == NSFileWriteOutOfSpaceError ? "No hay espacio en el iPhone para guardar. Tu personalización sigue en el formulario." : "No se pudo guardar en el iPhone. Tu personalización sigue en el formulario; vuelve a intentarlo."; return false }
     }
-    func apply(_ m: Operation) {
-        if m.op == "delete",let id = m.id { state.snapshot.habits.removeAll{$0.id == id}; state.snapshot.entries.removeAll{$0.habitId == id} }
-        else if m.op == "habit", let h = m.habit { if let i = state.snapshot.habits.firstIndex(where:{$0.id == h.id}) { state.snapshot.habits[i] = h } else { state.snapshot.habits.append(h) } }
-        else if m.op == "archive", let id = m.id, let i = state.snapshot.habits.firstIndex(where:{$0.id == id}) { state.snapshot.habits[i].archived = m.archived ?? true }
-        else if m.op == "mood", let date = m.date, let mood = m.mood { state.snapshot.moods.removeAll { $0.date == date }; state.snapshot.moods.append(Mood(date:date,mood:mood,note:m.note ?? "")) }
-        else if m.op == "entry", let id = m.id, let date = m.date {
-            let i = state.snapshot.entries.firstIndex { $0.habitId == id && $0.date == date }
-            var e = i.map { state.snapshot.entries[$0] } ?? Entry(habitId:id,date:date)
-            switch m.mode {
-            case "skip": e.skipped = m.checked ?? true
-            case "increment": e.skipped = false; e.value = min(1e9,max(0,e.value + (m.value ?? 0))); e.checked = false
-            case "set": e.skipped = false; e.value = max(0,m.value ?? 0); e.checked = false
-            case "check": e.skipped = false; e.checked = m.checked ?? true
-            case "clear": e.skipped = false; e.value = 0; e.checked = false
-            case "note": e.note = m.note ?? ""; e.mood = m.mood
-            default: break
-            }
-            e.updatedAt = ISO8601DateFormatter().string(from:Date())
-            if let i { state.snapshot.entries[i] = e } else { state.snapshot.entries.append(e) }
-        }
-    }
+    func apply(_ m: Operation) { state.snapshot.apply(m) }
     @discardableResult func mutate(_ m: Operation) -> Bool {
         let previous = state
         apply(m); state.queue.append(m)
@@ -88,38 +66,49 @@ final class HabitStore: ObservableObject {
     func isHidden(_ h:Habit,_ date:String) -> Bool { (UserDefaults.standard.stringArray(forKey:"repeat.hidden."+date) ?? []).contains(h.id) }
     func hide(_ h:Habit,_ date:String,_ hidden:Bool = true) { var ids = UserDefaults.standard.stringArray(forKey:"repeat.hidden."+date) ?? []; ids.removeAll{$0 == h.id}; if hidden { ids.append(h.id) }; UserDefaults.standard.set(ids,forKey:"repeat.hidden."+date); objectWillChange.send() }
     func percentage(_ date: String,_ habits: [Habit]? = nil) -> Double { let hs = (habits ?? active).filter { $0.scheduled(date) && !isSkipped($0,date) }; return hs.isEmpty ? 0 : hs.reduce(0) { $0 + $1.progress(date,entries).ratio } / Double(hs.count) }
-    func sync() async {
+    var lastCloudSync:Date? { state.cloud?.lastSync }
+    func enableCloud() async {
+        guard CloudSync.available else { error = CloudSyncError.unavailable.localizedDescription; return }
+        connected = true; UserDefaults.standard.set(true,forKey:"repeat.icloud.enabled")
+        await sync(force:true)
+    }
+    func disableCloud() {
         guard !syncing else { return }
+        connected = false; UserDefaults.standard.set(false,forKey:"repeat.icloud.enabled")
+        syncText = "Solo en este iPhone"
+    }
+    func deleteCloudCopy() async {
+        guard CloudSync.available,!syncing else { return }
         syncing = true; defer { syncing = false }
-        syncText = "Sincronizando…"
         do {
-            let cookies = await WKWebsiteDataStore.default().httpCookieStore.allCookies()
-            let selected = cookies.filter { let domain = $0.domain.trimmingCharacters(in:CharacterSet(charactersIn:".")); return domain == site.host || site.host!.hasSuffix("." + domain) }
-            guard !selected.isEmpty else { throw SyncError.signIn }
-            let configuration = URLSessionConfiguration.ephemeral
-            configuration.httpShouldSetCookies = false
-            let session = URLSession(configuration:configuration,delegate:redirectGuard,delegateQueue:nil)
-            defer { session.invalidateAndCancel() }
-            func request(_ op: Operation?) async throws -> Snapshot {
-                var req = URLRequest(url:site.appending(path:"api/state")); req.timeoutInterval = 20
-                for (k,v) in HTTPCookie.requestHeaderFields(with:selected) { req.setValue(v,forHTTPHeaderField:k) }
-                if let op { req.httpMethod = "POST"; req.httpBody = try JSONEncoder().encode(op); req.setValue("application/json",forHTTPHeaderField:"Content-Type"); req.setValue(Self.origin,forHTTPHeaderField:"Origin") }
-                let (data,response) = try await session.data(for:req)
-                guard let http = response as? HTTPURLResponse else { throw SyncError.network }
-                if [301,302,303,307,308,401,403].contains(http.statusCode) { throw SyncError.signIn }
-                guard http.statusCode == 200 else { if let payload = try? JSONSerialization.jsonObject(with:data) as? [String:String],let message = payload["error"] { throw BackupError.invalid(message) }; throw SyncError.network }
-                return try JSONDecoder().decode(Snapshot.self,from:data)
-            }
-            // Local records created offline keep their stable UUIDs and are sent before a remote snapshot replaces local state.
-            while let op = state.queue.first {
-                let remote = try await request(op)
-                state.queue.removeFirst(); if state.queue.isEmpty { state.snapshot = remote }; save()
-            }
-            if state.queue.isEmpty { let remote = try await request(nil); state.snapshot = remote; for pending in state.queue { apply(pending) }; save() }
-            connected = true; UserDefaults.standard.set(true,forKey:"repeat.connected"); syncText = "Todo sincronizado"; error = nil
-        } catch SyncError.signIn { connected = false; UserDefaults.standard.set(false,forKey:"repeat.connected"); syncText = "Conecta tu cuenta para sincronizar" }
-        catch let failure as BackupError { syncText = "Hay un cambio que requiere revisión"; self.error = failure.localizedDescription }
-        catch { syncText = "Guardado local · sin conexión" }
+            try await cloud.deleteCopy(link:state.cloud)
+            connected = false; UserDefaults.standard.set(false,forKey:"repeat.icloud.enabled")
+            let previous = state; state.cloud = nil
+            guard save() else { state = previous; return }
+            syncText = "Copia de iCloud eliminada · datos locales conservados"
+        } catch { self.error = error.localizedDescription }
+    }
+    func sync(force:Bool = false) async {
+        guard connected,!syncing else { return }
+        if !force,state.queue.isEmpty,let last = lastCloudSync,Date().timeIntervalSince(last) < 300 { return }
+        syncing = true; defer { syncing = false }
+        syncText = "Sincronizando con iCloud…"
+        let captured = state
+        do {
+            let result = try await cloud.exchange(captured)
+            let previous = state
+            let processed = Set(captured.queue.map(\.requestId))
+            state.queue.removeAll { processed.contains($0.requestId) }
+            state.snapshot = result.snapshot
+            // Edits made while CloudKit was awaiting the network remain queued and visible.
+            for pending in state.queue { apply(pending) }
+            state.cloud = result.link
+            guard save() else { state = previous; syncText = "Falta confirmar el guardado local"; return }
+            syncText = state.queue.isEmpty ? "Copia actualizada en iCloud" : "Hay cambios pendientes de enviar"
+        } catch {
+            syncText = "Sincronización pendiente · datos guardados en el iPhone"
+            self.error = CloudSync.message(for:error)
+        }
     }
     func startFocus(_ h: Habit,_ date: String,countdown: Bool) {
         guard focus == nil else { return }; let effective = h.at(date),seconds = max(1,(effective.goal-h.progress(date,entries).value)*(effective.unit == "hr" ? 3600 : effective.unit == "min" ? 60 : 1))
@@ -190,14 +179,16 @@ final class HabitStore: ObservableObject {
     func renameGroup(_ old:String,to name:String) { for var h in state.snapshot.habits.filter({$0.group == old}) { h.group = limitedText(name.trimmingCharacters(in:.whitespacesAndNewlines),60); mutate(Operation(op:"habit",habit:h)) } }
     @discardableResult func delete(_ habit:Habit) -> Bool { guard focus?.habitId != habit.id else { return false }; guard mutate(Operation(op:"delete",id:habit.id)) else { return false }; healthConfiguration.sources.removeValue(forKey:habit.id); healthConfiguration.entries.removeAll{$0.habitId == habit.id}; saveHealth(); return true }
     func duplicate(_ habit:Habit) { var h = habit; h.id = UUID().uuidString.lowercased(); h.name = limitedText(h.name+" (copia)",100); h.order = (state.snapshot.habits.map(\.order).max() ?? 0)+1; h.archived = false; storeHabit(h) }
-    func restore(_ backup:Snapshot) {
+    @discardableResult func restore(_ backup:Snapshot) -> Bool {
+        let previous = state
         for h in backup.habits { apply(Operation(op:"habit",habit:h)); state.queue.append(Operation(op:"habit",habit:h)) }
         for e in backup.entries {
             let operations = [Operation(op:"entry",id:e.habitId,date:e.date,mode:"set",value:e.value),Operation(op:"entry",id:e.habitId,date:e.date,mode:"check",checked:e.checked),Operation(op:"entry",id:e.habitId,date:e.date,mode:"note",note:e.note,mood:e.mood),Operation(op:"entry",id:e.habitId,date:e.date,mode:"skip",checked:e.skipped ?? false)]
             for op in operations { apply(op); state.queue.append(op) }
         }
         for mood in backup.moods { let op = Operation(op:"mood",date:mood.date,note:mood.note,mood:mood.mood); apply(op); state.queue.append(op) }
-        save(); Task { await scheduleReminders(); if connected { await sync() } }
+        guard save() else { state = previous; return false }
+        Task { await scheduleReminders(); if connected { await sync() } }; return true
     }
     func reconcileFocus() { if let f = focus,f.countdown,Date().timeIntervalSince(f.start) >= f.seconds { stopFocus() } }
     func scheduleReminders() async {
@@ -216,8 +207,4 @@ final class HabitStore: ObservableObject {
             try? await center.add(UNNotificationRequest(identifier:"repeat:\(h.id):\(Day.key(at)):\(time)",content:content,trigger:trigger))
         }
     }
-}
-enum SyncError: Error { case signIn, network }
-final class NoRedirect: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
-    func urlSession(_ session: URLSession,task: URLSessionTask,willPerformHTTPRedirection response: HTTPURLResponse,newRequest request: URLRequest,completionHandler: @escaping @Sendable (URLRequest?) -> Void) { completionHandler(nil) }
 }

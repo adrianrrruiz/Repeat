@@ -2,6 +2,8 @@
 
 Aplicación personal de hábitos para iPhone y computador, inspirada en la experiencia de Habit Tracker. Interfaz en español, tarjetas de colores, hábitos ilimitados y sincronización privada.
 
+La app principal actual es [Repeat nativa para iOS](ios/README.md). Desde la versión 1.7 guarda en el iPhone y retira la sincronización con la web. La integración privada de iCloud está preparada, pero la firma gratuita actual impide activarla. Las secciones de cliente web que siguen describen la versión anterior, que continúa separada.
+
 ## Funciones
 
 - Crear y editar hábitos: icono, nombre, descripción, color, grupo, construir/dejar, meta y unidad.

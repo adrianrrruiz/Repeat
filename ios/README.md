@@ -24,15 +24,25 @@ Abre `Repeat.xcodeproj` en Xcode y selecciona el scheme Repeat. El proyecto util
 - Widgets de inicio y pantalla bloqueada, registro desde widgets y temporizador con Actividad en Vivo/Dynamic Island.
 - Bloqueo Face ID/código, temas claro/oscuro/sistema, frases y vista semanal configurable.
 
-## Sincronizar con el computador
+## Privacidad e iCloud (1.7, build 8)
 
-Mi espacio → Conectar con el computador. Inicia sesión con la misma cuenta de ChatGPT que utilizas en la web y pulsa Comprobar. Solo el inicio de sesión utiliza WebKit; las pantallas de la app son SwiftUI.
+La app nativa guarda primero en el iPhone y ya no realiza peticiones a Sites, OpenAI ni a la API de la web. El cliente web anterior continúa separado: esta actualización no borra sus datos ni cambia su acceso.
 
-Las cookies permanecen en el almacén del sistema. Las peticiones a la API únicamente reciben las cookies correspondientes al dominio de Repeat, nunca se imprimen ni se exportan. El cliente evita seguir redirecciones de API hacia otros dominios.
+Mi espacio → Privacidad e iCloud explica el estado real de la instalación. La configuración de desarrollo gratuita instala la app en modo local: **iCloud no está activo y todavía no existe una copia confirmada por esta integración**. La interfaz ofrece exportación JSON y restauración manual.
 
-Los cambios sin conexión se conservan en una cola local con identificadores estables y se envían al conectar. Los incrementos usan los recibos del servidor para evitar duplicación por reintentos. Los temporizadores en curso son propios de cada dispositivo.
+La integración preparada usa CloudKit exclusivamente en la base privada de la cuenta de Apple de la persona, con campos cifrados para el snapshot y los recibos. La primera activación pide combinar los hábitos, conservando valores locales en coincidencias; después utiliza operaciones con recibos y guardado atómico. Las metas por fecha, notas y saltos permanecen en el snapshot. Las lecturas/correcciones de Salud, cookies, borradores y sesiones de temporizador no entran al payload.
 
-La sincronización necesita que el propietario complete el inicio de sesión en el teléfono; esa autenticación personal no se hizo durante la instalación. Si el proveedor de identidad rechaza el navegador integrado, la conexión necesita un flujo nativo de autenticación adicional. Los hábitos locales continúan disponibles.
+El estado, la cola, la cuenta vinculada y la última sincronización confirmada se persisten juntos. Los cambios hechos durante una petición se conservan. Un cambio de cuenta o una copia remota eliminada/reemplazada detiene el envío para evitar mezclas o resucitar la copia. La primera combinación deliberada puede restaurar datos locales: la interfaz lo explica antes de activar.
+
+La copia cifrada se divide en registros y se publica con un manifiesto, comparación de versión y escritura atómica en una zona privada. Cada publicación retira los fragmentos de la generación anterior. Eliminar la copia borra esa zona y desactiva la sincronización, conservando los hábitos locales. No se promete un historial de respaldos ni recuperación de cambios todavía pendientes. La validación de snapshots conserva el límite actual de 10 MB de la importación; errores de cuota/tamaño/red no vacían la cola. Con varios dispositivos se reintenta un conflicto; algunas operaciones sobre hábitos borrados requieren revisión si la validación no permite aplicarlas.
+
+### Habilitación pendiente de Apple
+
+Xcode confirmó que el equipo personal gratuito actual no admite iCloud. Para habilitarlo se necesita una firma compatible, registrar `iCloud.com.adrianruiz.repeat` para el bundle existente y configurar en CloudKit los tipos `RepeatManifest` (campo `chunks`, lista de cadenas) y `RepeatEncryptedChunk` (campo cifrado `payload`, Bytes). El esquema debe desplegarse al entorno correspondiente antes de distribución. No se contrató ninguna membresía ni se creó el contenedor.
+
+Los ajustes `REPEAT_CLOUD_FLAGS=REPEAT_ICLOUD` y `REPEAT_CLOUD_ENTITLEMENTS=Repeat/RepeatCloud.entitlements` activan la variante iCloud solo en el target principal; no deben usarse con la firma gratuita. La configuración predeterminada conserva `Repeat.entitlements` y no intenta acceder a CloudKit. Compilar la variante con el simulador no prueba la conexión a una cuenta ni su recuperación.
+
+Pendiente, tras disponer de firma/contenedor: probar subida real, descifrado en otro iPhone de la misma cuenta, pérdida de red, cuota, conflictos entre dispositivos y borrado. No marcar la protección con iCloud como operativa antes de completar esas pruebas.
 
 ## Compilar e instalar
 
@@ -101,3 +111,11 @@ El botón superior abre un panel como el observado en Habit: Estado (Todos, Pend
 
 La versión 1.6 se instaló sobre la anterior sin desinstalar. La copia del estado y la cola tras instalar fue idéntica a la copia previa; se conservaron los nueve hábitos activos presentes en esa copia.
 La app actualizada se abrió y el panel de filtros se comprobó también mediante iPhone Mirroring en el dispositivo físico.
+
+## Verificación 1.7
+
+- 79 comprobaciones nativas: las 63 anteriores y 16 de copia privada/reconciliación, recibos, migración, borrado y aislamiento del formato portable. Son pruebas locales, no una subida a iCloud.
+- Compilación de simulador con la variante iCloud y con el modo local: correcta.
+- Compilación de dispositivo con la firma gratuita y modo local: correcta. Xcode rechaza expresamente habilitar iCloud con ese equipo.
+- Interfaz de simulador: Mi espacio → Privacidad e iCloud muestra la limitación real; la alternativa de exportación abre Copia y exportación.
+- Instalada en el iPhone del propietario conservando el bundle ID. Documents coincidió byte por byte con la copia local previa. La apertura física quedó bloqueada por el bloqueo del teléfono; Mirroring solicita desbloquearlo. La interfaz del teléfono para esta versión aún no está comprobada.

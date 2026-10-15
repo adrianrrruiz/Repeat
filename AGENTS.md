@@ -43,6 +43,17 @@
 - No sumar unidades de versiones distintas en un periodo que cruce un cambio. Los límites de periodo se recortan por versión.
 - La sincronización y los JSON deben conservar `metricHistory`. El servidor protege el historial cuando un cliente anterior lo omite. Los temporizadores retienen la unidad con que arrancaron.
 
+## Privacidad y sincronización desde 1.7
+
+- La prioridad es la app móvil y recuperar los hábitos si se pierde el iPhone. Mac, Windows y una posible web de análisis quedan para después.
+- Los hábitos no deben pasar por un servidor propio de Repeat, Sites/OpenAI o Cloudflare. Desde 1.7 el cliente nativo eliminó WebKit/cookies/API de Sites de su flujo de conexión; la web anterior continúa separada y no se borraron sus datos.
+- iCloud es opcional y usa la cuenta privada de Apple de la persona. La app funciona localmente sin cuenta. No afirmar que los datos nunca salen del teléfono cuando se activa una nube.
+- `CloudSync.swift` prepara la base privada CloudKit con campos cifrados y una zona/manifiesto atómicos. `CloudReplica.swift` conserva recibos y combina el primer envío sin duplicar incrementos. El vínculo de cuenta/época/última sincronización está en `SavedState.cloud`, junto con estado y cola.
+- **La firma gratuita actual no admite iCloud**, confirmado por Xcode. La build instalada permanece local; no existe una prueba de subida/recuperación real. No contratar membresías sin petición expresa.
+- Para una firma compatible: contenedor `iCloud.com.adrianruiz.repeat`, `REPEAT_CLOUD_FLAGS=REPEAT_ICLOUD` y `REPEAT_CLOUD_ENTITLEMENTS=Repeat/RepeatCloud.entitlements`; esquema y pruebas pendientes en `ios/README.md`. No cambiar el bundle ID.
+- No reactivar el backend antiguo como alternativa si iCloud falla. Conservar datos/cola y ofrecer exportación manual. Sincronización no equivale a historial de respaldos; no prometer recuperar cambios pendientes.
+- La copia de iCloud incluye el snapshot manual y recibos, nunca `HealthConfiguration`, lecturas/correcciones de Salud ni cookies. Borrar la copia requiere confirmación y conserva el estado local.
+
 ## Apple Health
 
 - Integración de **solo lectura**. Los permisos los concede el propietario en iOS; no inferir permiso de lectura a partir de ausencia de muestras.
@@ -72,11 +83,11 @@
 ## Validación e instalación
 
 - Comandos de compilación, dispositivo y firma en `ios/README.md`. Descubre el dispositivo actual si no está conectado; no supongas que los identificadores o la firma siguen vigentes.
-- Incrementa versión/build para actualizaciones instaladas. Última actualización: Repeat 1.6, build 7 (filtros de Hoy), el 14 de octubre de 2026.
+- Incrementa versión/build para actualizaciones instaladas. Última actualización: Repeat 1.7, build 8 (privacidad e integración iCloud preparada; firma gratuita en modo local), el 14 de octubre de 2026.
 - Pruebas nativas del modelo y persistencia:
 
   ```sh
-  swiftc ios/Repeat/Models.swift ios/Repeat/Metrics.swift ios/Repeat/Persistence.swift ios/Repeat/NativeStorage.swift ios/Tests/main.swift -o /tmp/repeat-native-tests
+  swiftc ios/Repeat/Models.swift ios/Repeat/Metrics.swift ios/Repeat/Persistence.swift ios/Repeat/NativeStorage.swift ios/Repeat/CloudReplica.swift ios/Tests/main.swift -o /tmp/repeat-native-tests
   /tmp/repeat-native-tests
   ```
 
