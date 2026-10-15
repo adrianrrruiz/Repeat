@@ -54,6 +54,15 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+/.archify/
+
+# Personal app data and signing material
+repeat-state*.json
+repeat-health-local.json
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
 
 *.tsbuildinfo
 
