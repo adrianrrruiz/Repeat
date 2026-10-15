@@ -4,6 +4,8 @@ Aplicación personal de hábitos para iPhone y computador, inspirada en la exper
 
 La app principal actual es [Repeat nativa para iOS](ios/README.md). Desde la versión 1.7 guarda en el iPhone y retira la sincronización con la web. La integración privada de iCloud está preparada, pero la firma gratuita actual impide activarla. Las secciones de cliente web que siguen describen la versión anterior, que continúa separada.
 
+La [landing pública de Repeat](https://repeat-landing-murex.vercel.app/) se mantiene en [`landing/`](landing/README.md) y se aloja de forma independiente en Vercel. No recibe datos de hábitos.
+
 ## Funciones
 
 - Crear y editar hábitos: icono, nombre, descripción, color, grupo, construir/dejar, meta y unidad.

@@ -1,0 +1,6 @@
+.git
+.vercel
+README.md
+DESIGN.md
+*.log
+.env*

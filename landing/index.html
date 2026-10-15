@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f5f8f3" />
+    <title>Repeat — Las cosas buenas se repiten.</title>
+    <meta
+      name="description"
+      content="Un pequeño paso, cada día. Repeat es una app de hábitos para iPhone, sin límite de hábitos y con tus datos bajo tu control. Conoce el proyecto y prueba su experiencia."
+    />
+    <meta property="og:title" content="Repeat — Las cosas buenas se repiten." />
+    <meta
+      property="og:description"
+      content="Un espacio para tus hábitos. A tu ritmo, sin límites y con tus datos bajo tu control. En desarrollo para iPhone."
+    />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:url"
+      content="https://repeat-landing-murex.vercel.app/"
+    />
+    <link rel="canonical" href="https://repeat-landing-murex.vercel.app/" />
+    <meta property="og:locale" content="es_ES" />
+    <link rel="icon" href="/assets/repeat.svg" type="image/svg+xml" />
+    <link
+      rel="preload"
+      href="/assets/bricolage-grotesque-4fd48b2c.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/assets/fonts.css" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+    <svg
+      class="svg-library"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <defs>
+        <symbol id="i-repeat" viewBox="0 0 24 24">
+          <path
+            d="M17 3l4 4-4 4M3 11V9a2 2 0 0 1 2-2h16M7 21l-4-4 4-4m14 0v2a2 2 0 0 1-2 2H3"
+          />
+        </symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" />
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24">
+          <path d="m5 12 4 4L19 6" />
+        </symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24">
+          <path d="M5 12h14m-6-6 6 6-6 6" />
+        </symbol>
+        <symbol id="i-lock" viewBox="0 0 24 24">
+          <rect x="5" y="10" width="14" height="11" rx="3" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2" />
+        </symbol>
+        <symbol id="i-cloud" viewBox="0 0 24 24">
+          <path
+            d="M6 18h12a4 4 0 0 0 .6-8 7 7 0 0 0-13.4-1A4.5 4.5 0 0 0 6 18Z"
+          />
+        </symbol>
+        <symbol id="i-phone" viewBox="0 0 24 24">
+          <rect x="6" y="2" width="12" height="20" rx="3" />
+          <path d="M10 5h4m-3 14h2" />
+        </symbol>
+        <symbol id="i-close" viewBox="0 0 24 24">
+          <path d="m6 6 12 12M6 18 18 6" />
+        </symbol>
+        <symbol id="i-chevron" viewBox="0 0 24 24">
+          <path d="m6 9 6 6 6-6" />
+        </symbol>
+        <symbol id="i-infinity" viewBox="0 0 24 24">
+          <path d="M12 12C9 6 3 6 3 12s6 6 9 0 9-6 9 0-6 6-9 0Z" />
+        </symbol>
+      </defs>
+    </svg>
+    <header class="header wrap">
+      <a class="brand" href="#inicio" aria-label="Repeat, inicio"
+        ><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+          <use href="#i-repeat" /></svg
+        >repeat<span class="brand-dot">.</span></a
+      >
+      <nav aria-label="Navegación principal">
+        <a href="#experiencia">La experiencia</a
+        ><a href="#a-tu-ritmo">A tu ritmo</a><a href="#privacidad">Tus datos</a>
+      </nav>
+      <button class="button header-button" data-dialog="launch">
+        <svg class="icon" aria-hidden="true"><use href="#i-phone" /></svg>Para
+        iPhone<span class="soon-dot" aria-hidden="true"></span>
+      </button>
+    </header>
+    <main id="contenido">
+      <section class="hero wrap" id="inicio" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <span class="intro-label"
+            ><span class="sprout" aria-hidden="true">✳</span> Un pequeño paso.
+            Cada día.</span
+          >
+          <h1 id="hero-title">Las cosas<br />buenas se<br />repiten.</h1>
+          <p>
+            Leer un poco. Moverte más. Hacer una pausa.<br
+              class="desktop-break"
+            />
+            Un espacio para los hábitos que te hacen bien,<br
+              class="desktop-break"
+            />
+            al ritmo de tu vida.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-dark" href="#experiencia"
+              >Descubre tu próximo hábito<svg class="icon" aria-hidden="true">
+                <use href="#i-arrow" /></svg
+            ></a>
+          </div>
+          <div class="hero-caption">
+            <svg class="icon" aria-hidden="true"><use href="#i-phone" /></svg
+            >Hecha para iPhone. En desarrollo.
+          </div>
+        </div>
+        <div class="hero-product" id="experiencia">
+          <div class="petal" aria-hidden="true"></div>
+          <div class="little-note" aria-hidden="true">
+            La constancia<br />también se aprende.<span>↘</span>
+          </div>
+          <div class="phone" aria-label="Demostración interactiva de Repeat">
+            <div class="phone-status" aria-hidden="true">
+              <span>9:41</span><span class="island"></span
+              ><span class="status-symbols"
+                >▮▮▮ <span class="battery"></span
+              ></span>
+            </div>
+            <div class="phone-heading">
+              <span class="filter-pill"
+                >Todos <span aria-hidden="true">⌄</span></span
+              >
+              <h2>Hoy</h2>
+              <span class="phone-add" aria-hidden="true">+</span>
+            </div>
+            <div class="phone-date">Un día para volver a empezar.</div>
+            <div class="week" aria-label="Semana de ejemplo">
+              <span>L<span class="day-ring full">12</span></span
+              ><span>M<span class="day-ring partial">13</span></span
+              ><span class="today"
+                >M<span class="day-ring today-ring">14</span></span
+              ><span>J<span class="day-ring">15</span></span
+              ><span>V<span class="day-ring">16</span></span
+              ><span>S<span class="day-ring">17</span></span
+              ><span>D<span class="day-ring">18</span></span>
+            </div>
+            <div class="habit-list">
+              <div
+                class="habit water"
+                data-habit="water"
+                style="--progress: 25%"
+              >
+                <span class="habit-fill"></span
+                ><span class="habit-emoji" aria-hidden="true">💧</span>
+                <div class="habit-text">
+                  <h3>Beber agua</h3>
+                  <span class="habit-value">2 de 8 vasos</span>
+                </div>
+                <button
+                  class="habit-add"
+                  data-add="water"
+                  aria-label="Añadir un vaso de agua"
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#i-plus" />
+                  </svg>
+                </button>
+              </div>
+              <div
+                class="habit reading"
+                data-habit="reading"
+                style="--progress: 50%"
+              >
+                <span class="habit-fill"></span
+                ><span class="habit-emoji" aria-hidden="true">📚</span>
+                <div class="habit-text">
+                  <h3>Leer un poco</h3>
+                  <span class="habit-value">10 de 20 min</span>
+                </div>
+                <button
+                  class="habit-add"
+                  data-add="reading"
+                  aria-label="Añadir cinco minutos de lectura"
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#i-plus" />
+                  </svg>
+                </button>
+              </div>
+              <div
+                class="habit mindful"
+                data-habit="mindful"
+                style="--progress: 0%"
+              >
+                <span class="habit-fill"></span
+                ><span class="habit-emoji" aria-hidden="true">🧘</span>
+                <div class="habit-text">
+                  <h3>Una pausa</h3>
+                  <span class="habit-value">0 de 5 min</span>
+                </div>
+                <button
+                  class="habit-add"
+                  data-add="mindful"
+                  aria-label="Añadir un minuto de pausa"
+                >
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#i-plus" />
+                  </svg>
+                </button>
+              </div>
+              <div
+                class="habit walk"
+                data-habit="walk"
+                style="--progress: 100%"
+              >
+                <span class="habit-fill"></span
+                ><span class="habit-emoji" aria-hidden="true">🌿</span>
+                <div class="habit-text">
+                  <h3>Salir a caminar</h3>
+                  <span class="habit-value">¡Un paso más!</span>
+                </div>
+                <span class="habit-done" aria-label="Hábito completado"
+                  ><svg class="icon" aria-hidden="true">
+                    <use href="#i-check" /></svg
+                ></span>
+              </div>
+            </div>
+            <div class="daily-progress">
+              <span id="daily-summary">1 de 4 hábitos completados</span
+              ><span id="daily-percentage">44 %</span>
+              <div class="daily-track">
+                <span id="daily-fill" style="width: 44%"></span>
+              </div>
+            </div>
+            <div class="phone-nav" aria-hidden="true">
+              <span class="nav-selected">⌂</span><span>▥</span><span>▱</span
+              ><span>☷</span><span>⚙</span>
+            </div>
+          </div>
+          <div class="round-note" aria-hidden="true">
+            <svg class="round-star" viewBox="0 0 100 100">
+              <path
+                d="M50 0 59 30 79 10 75 38 100 35 80 54 98 72 69 70 72 98 52 78 34 100 34 72 7 81 22 57 0 43 29 38 20 13 43 29Z"
+              /></svg
+            ><span>A tu ritmo.<br />Siempre.</span>
+          </div>
+          <div class="demo-caption">
+            <span class="try-label">Prueba los +</span
+            ><span>Hábitos de ejemplo.<br />Nada sale de esta página.</span
+            ><button
+              id="reset-demo"
+              type="button"
+              aria-label="Reiniciar la demostración"
+            >
+              <svg class="icon" aria-hidden="true">
+                <use href="#i-repeat" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+      <div
+        class="live-region sr-only"
+        role="status"
+        aria-live="polite"
+        id="demo-status"
+      ></div>
+      <section class="principles wrap" aria-label="Lo esencial de Repeat">
+        <span
+          ><svg class="icon" aria-hidden="true"><use href="#i-infinity" /></svg
+          >Hábitos sin límites</span
+        ><span
+          ><span class="tiny-flower" aria-hidden="true">✳</span>Progreso, sin
+          presión</span
+        ><span
+          ><svg class="icon" aria-hidden="true"><use href="#i-lock" /></svg>Tus
+          datos, tuyos</span
+        >
+      </section>
+      <section class="manifesto wrap" aria-labelledby="manifesto-title">
+        <h2 id="manifesto-title">No tienes que<br />cambiarlo todo.</h2>
+        <div>
+          <p>
+            A veces, cuidarte cabe en un vaso de agua.<br />O en ese libro que
+            lleva días esperándote.
+          </p>
+          <p>
+            Repeat te ayuda a hacer espacio para esas pequeñas cosas. Sin
+            rutinas perfectas. Sin empezar de cero cada lunes. Con un lugar al
+            que siempre puedes volver.
+          </p>
+          <span class="manifesto-sign">Un hábito a la vez.</span>
+        </div>
+      </section>
+      <section
+        class="rhythm-section"
+        id="a-tu-ritmo"
+        aria-labelledby="rhythm-title"
+      >
+        <div class="wrap rhythm-inner">
+          <div class="rhythm-copy">
+            <span class="section-kicker">Hecha para tu vida</span>
+            <h2 id="rhythm-title">
+              Tu forma de avanzar<br />tiene su propia medida.
+            </h2>
+            <p>Vasos, páginas, pasos o minutos.<br />Tú decides qué cuenta.</p>
+            <div
+              class="demo-tabs"
+              role="tablist"
+              aria-label="Explorar tipos de hábito"
+            >
+              <button
+                id="tab-quantity"
+                role="tab"
+                aria-selected="true"
+                aria-controls="panel-quantity"
+                tabindex="0"
+                data-tab="quantity"
+              >
+                Cantidades</button
+              ><button
+                id="tab-time"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-time"
+                tabindex="-1"
+                data-tab="time"
+              >
+                Tiempo</button
+              ><button
+                id="tab-history"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-history"
+                tabindex="-1"
+                data-tab="history"
+              >
+                Tu historia
+              </button>
+            </div>
+            <div class="tab-copy" aria-live="polite">
+              <h3 id="tab-heading">Cada pequeño gesto suma.</h3>
+              <p id="tab-description">
+                Elige una meta, añade lo que hiciste y mira cómo tu hábito se
+                llena. Así de sencillo.
+              </p>
+            </div>
+          </div>
+          <div class="rhythm-visual">
+            <div
+              class="metric-panel"
+              id="panel-quantity"
+              role="tabpanel"
+              aria-labelledby="tab-quantity"
+              tabindex="0"
+            >
+              <div class="metric-top">
+                <span>💧 Beber agua</span
+                ><span class="example-label">Ejemplo</span>
+              </div>
+              <div class="metric-ring" style="--ring: 50%">
+                <div>
+                  <span class="metric-emoji" aria-hidden="true">💧</span
+                  ><strong>4 <span>/ 8</span></strong
+                  ><span>vasos de agua</span>
+                </div>
+              </div>
+              <div class="metric-bottom">
+                <span>Un vaso más cerca.</span
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-check" />
+                </svg>
+              </div>
+            </div>
+            <div
+              class="metric-panel"
+              id="panel-time"
+              role="tabpanel"
+              aria-labelledby="tab-time"
+              tabindex="0"
+              hidden
+            >
+              <div class="metric-top">
+                <span>🧘 Una pausa</span
+                ><span class="example-label">Ejemplo</span>
+              </div>
+              <div class="time-display">
+                <span class="time-orbit" aria-hidden="true"></span
+                ><span class="metric-emoji" aria-hidden="true">🧘</span
+                ><strong>05<span>:</span>00</strong
+                ><span>Cinco minutos para ti.</span>
+              </div>
+              <div class="metric-bottom">
+                <span>Tu tiempo también cuenta.</span
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-check" />
+                </svg>
+              </div>
+            </div>
+            <div
+              class="metric-panel"
+              id="panel-history"
+              role="tabpanel"
+              aria-labelledby="tab-history"
+              tabindex="0"
+              hidden
+            >
+              <div class="metric-top">
+                <span>🌱 Tu constancia</span
+                ><span class="example-label">Ejemplo</span>
+              </div>
+              <div class="history-preview">
+                <span>Pequeños pasos que dejan huella.</span>
+                <div
+                  class="history-grid"
+                  aria-label="Calendario ilustrativo de progreso"
+                ></div>
+                <div class="history-legend">
+                  <span>Menos</span><i></i><i></i><i></i><i></i><span>Más</span>
+                </div>
+              </div>
+              <div class="metric-bottom">
+                <span>Mira todo lo que ya hiciste.</span
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-check" />
+                </svg>
+              </div>
+            </div>
+            <span class="visual-caption"
+              >Diferentes hábitos. Un mismo espacio.</span
+            >
+          </div>
+        </div>
+      </section>
+      <section class="possibilities wrap" aria-labelledby="possibilities-title">
+        <div class="section-heading">
+          <h2 id="possibilities-title">
+            Lo importante no es<br />hacerlo perfecto. Es volver.
+          </h2>
+          <p>
+            Lo que necesitas para cuidar tu rutina,<br />sin convertirla en otra
+            tarea.
+          </p>
+        </div>
+        <div class="feature-row">
+          <article class="feature">
+            <div class="feature-art flexible-art" aria-hidden="true">
+              <span>L</span><span class="chosen">M</span><span>V</span
+              ><span class="chosen">D</span><span class="small-petal">✳</span>
+            </div>
+            <h3>Tu semana, tus reglas.</h3>
+            <p>
+              Todos los días, algunos días o por periodos. Haz que tus hábitos
+              se adapten a ti.
+            </p>
+          </article>
+          <article class="feature">
+            <div class="feature-art unlimited-art" aria-hidden="true">
+              <span>🏃</span><span>📚</span><span>🪴</span><span>✍️</span
+              ><span class="plus-bubble">+</span>
+            </div>
+            <h3>Espacio para todo lo tuyo.</h3>
+            <p>
+              Crea los hábitos que quieras. Organízalos en grupos y cambia tus
+              metas cuando lo necesites.
+            </p>
+          </article>
+          <article class="feature">
+            <div class="feature-art note-art" aria-hidden="true">
+              <span>Hoy me costó un poco.<br />Pero aquí estoy. <i>🌱</i></span>
+            </div>
+            <h3>Más que una casilla.</h3>
+            <p>
+              Añade notas y mira tu calendario. Cada día tiene una historia
+              detrás del número.
+            </p>
+          </article>
+        </div>
+      </section>
+      <section
+        class="privacy-section"
+        id="privacidad"
+        aria-labelledby="privacy-title"
+      >
+        <div class="wrap privacy-inner">
+          <div class="privacy-copy">
+            <span class="privacy-icon"
+              ><svg class="icon" aria-hidden="true"><use href="#i-lock" /></svg
+            ></span>
+            <h2 id="privacy-title">
+              Tus hábitos hablan de ti.<br />Y te pertenecen.
+            </h2>
+            <p>
+              La app guarda tus hábitos en tu iPhone. No necesitas crear una
+              cuenta de Repeat ni entregarnos tu rutina para empezar.
+            </p>
+            <button class="text-button privacy-link" data-dialog="privacy">
+              Así cuidamos tus datos<svg class="icon" aria-hidden="true">
+                <use href="#i-arrow" />
+              </svg>
+            </button>
+          </div>
+          <div class="privacy-map">
+            <div class="privacy-map-heading">
+              <span>El lugar de tus hábitos</span
+              ><span class="private-tag">Bajo tu control</span>
+            </div>
+            <div class="privacy-device">
+              <span class="device-illustration"
+                ><svg class="icon" aria-hidden="true">
+                  <use href="#i-phone" /></svg
+              ></span>
+              <div>
+                <strong>Tu iPhone</strong
+                ><span>Tu espacio. Tus registros.</span>
+              </div>
+              <span class="local-badge">Local</span>
+            </div>
+            <div class="cloud-connection">
+              <span></span>
+              <p>Solo si tú lo eliges</p>
+            </div>
+            <div class="privacy-cloud">
+              <svg class="icon" aria-hidden="true"><use href="#i-cloud" /></svg>
+              <div>
+                <strong>Tu iCloud privado</strong
+                ><span>Sincronización opcional, en preparación.</span>
+              </div>
+            </div>
+            <p class="privacy-footnote">
+              iCloud todavía no está activo en la versión actual. Puedes
+              exportar tus hábitos y guardar tu propia copia.
+            </p>
+          </div>
+        </div>
+      </section>
+      <section class="faq-section wrap" aria-labelledby="faq-title">
+        <div>
+          <span class="section-kicker">Antes de empezar</span>
+          <h2 id="faq-title">Buenas preguntas.</h2>
+          <p>Sin letra pequeña.</p>
+        </div>
+        <div class="faq-list">
+          <details>
+            <summary>
+              ¿Ya puedo descargar Repeat?<svg class="icon" aria-hidden="true">
+                <use href="#i-chevron" />
+              </svg>
+            </summary>
+            <p>
+              Repeat está en desarrollo para iPhone y todavía no tiene un
+              lanzamiento público en App Store. Mientras tanto, puedes explorar
+              esta página y probar la demostración con datos de ejemplo.
+            </p>
+          </details>
+          <details>
+            <summary>
+              ¿Necesito conexión o una cuenta?<svg
+                class="icon"
+                aria-hidden="true"
+              >
+                <use href="#i-chevron" />
+              </svg>
+            </summary>
+            <p>
+              La app funciona con tus hábitos guardados en el iPhone, también
+              sin conexión. No necesitas una cuenta de Repeat. La futura
+              sincronización opcional con iCloud usará tu propia cuenta de
+              Apple.
+            </p>
+          </details>
+          <details>
+            <summary>
+              ¿Mis datos se guardan en sus servidores?<svg
+                class="icon"
+                aria-hidden="true"
+              >
+                <use href="#i-chevron" />
+              </svg>
+            </summary>
+            <p>
+              La app nativa actual no envía los hábitos a un servidor de Repeat.
+              Guarda primero en el teléfono. La integración privada de iCloud
+              está preparada, pero aún no está activa. Esta landing usa solo
+              hábitos ficticios y no recibe tus registros.
+            </p>
+          </details>
+          <details>
+            <summary>
+              ¿Puedo llevarme mis hábitos?<svg class="icon" aria-hidden="true">
+                <use href="#i-chevron" />
+              </svg>
+            </summary>
+            <p>
+              Sí. La app permite exportar una copia JSON, restaurarla y exportar
+              registros en CSV. Las lecturas y correcciones de Apple Health
+              permanecen separadas en el iPhone y no se incluyen en esas
+              exportaciones.
+            </p>
+          </details>
+        </div>
+      </section>
+      <section class="closing wrap">
+        <div class="closing-flower" aria-hidden="true">✳</div>
+        <h2>Empieza pequeño.<br />Vuelve mañana.</h2>
+        <p>Lo que repites, poco a poco, se vuelve parte de ti.</p>
+        <a class="button button-dark" href="#experiencia" id="try-demo"
+          >Prueba un pequeño paso<svg class="icon" aria-hidden="true">
+            <use href="#i-plus" /></svg></a
+        ><span class="closing-caption"
+          >Repeat. Un espacio para volver a ti.</span
+        >
+      </section>
+    </main>
+    <footer class="footer wrap">
+      <a class="brand" href="#inicio" aria-label="Repeat, volver al inicio"
+        ><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
+          <use href="#i-repeat" /></svg
+        >repeat<span class="brand-dot">.</span></a
+      ><span>Hecha con intención. Para tu día a día.</span>
+      <div>
+        <button class="text-button" data-dialog="privacy">Privacidad</button
+        ><a
+          href="https://github.com/adrianrrruiz/Repeat"
+          target="_blank"
+          rel="noopener noreferrer"
+          >El proyecto<span class="sr-only"> (abre en otra pestaña)</span></a
+        ><span>© 2026</span>
+      </div>
+    </footer>
+    <dialog id="launch-dialog" aria-labelledby="launch-title">
+      <div class="dialog-content">
+        <button class="close-dialog" aria-label="Cerrar">
+          <svg class="icon" aria-hidden="true">
+            <use href="#i-close" />
+          </svg></button
+        ><span class="dialog-emoji" aria-hidden="true">🌱</span>
+        <h2 id="launch-title">Las cosas buenas<br />también toman tiempo.</h2>
+        <p>
+          Estamos creando Repeat para iPhone. Aún no está disponible
+          públicamente en App Store.
+        </p>
+        <p>
+          Por ahora, conoce la experiencia con los hábitos de ejemplo de esta
+          página.
+        </p>
+        <button class="button button-dark" id="launch-demo">
+          Probar la experiencia<svg class="icon" aria-hidden="true">
+            <use href="#i-arrow" />
+          </svg>
+        </button>
+      </div>
+    </dialog>
+    <dialog id="privacy-dialog" aria-labelledby="privacy-dialog-title">
+      <div class="dialog-content">
+        <button class="close-dialog" aria-label="Cerrar privacidad">
+          <svg class="icon" aria-hidden="true">
+            <use href="#i-close" />
+          </svg></button
+        ><svg class="dialog-lock icon" aria-hidden="true">
+          <use href="#i-lock" />
+        </svg>
+        <h2 id="privacy-dialog-title">Tu rutina es personal.</h2>
+        <h3>En la app</h3>
+        <p>
+          Los hábitos se guardan en tu iPhone. La app nativa actual no los envía
+          al antiguo servicio web de Repeat. Puedes exportar tus registros y
+          eliminar tus hábitos.
+        </p>
+        <h3>Sobre iCloud</h3>
+        <p>
+          La sincronización privada está en preparación y todavía no está
+          activa. Cuando se habilite, será opcional y usará la cuenta de Apple
+          de cada persona. Sincronizar implica enviar y guardar una copia en
+          Apple; no es un historial de respaldos.
+        </p>
+        <h3>En esta página</h3>
+        <p>
+          La demostración usa datos ficticios, vive en la memoria del navegador
+          y se reinicia al recargar. No solicita tu correo, no almacena tus
+          hábitos y no incorpora analítica ni rastreadores. Vercel sirve la
+          página y puede procesar datos técnicos de las peticiones, como la
+          dirección IP, para prestar el servicio.
+        </p>
+        <p class="dialog-note">
+          La antigua aplicación web sigue separada. Esta página y la
+          actualización nativa no eliminan datos que pudieran existir allí. Los
+          archivos que exportes quedan bajo tu control.
+        </p>
+      </div>
+    </dialog>
+  </body>
+</html>

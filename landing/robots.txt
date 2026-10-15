@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://repeat-landing-murex.vercel.app/sitemap.xml
