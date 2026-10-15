@@ -24,6 +24,8 @@ No incluye integración automática con Apple Health, widgets de iOS, Dynamic Is
 
 ## Arquitectura
 
+Diagrama de alto nivel: [arquitectura de Repeat](docs/architecture/README.md), con vista previa, HTML interactivo y fuente editable.
+
 - React con App Router mediante el starter Vinext de Sites.
 - `components/repeat.tsx`: navegación, registros, sincronización y temporizadores.
 - `components/editor.tsx`: formulario con selectores al estilo de la referencia.

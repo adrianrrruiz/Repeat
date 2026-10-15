@@ -1,0 +1,3 @@
+# Local delivery receipts contain machine-specific paths.
+*.delivery.json
+*.delivery-pending.json

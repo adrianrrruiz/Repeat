@@ -1,0 +1,477 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Repeat · arquitectura de alto nivel",
+    "locale": "es",
+    "output": "docs/architecture/repeat.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "git@github.com:adrianrrruiz/Repeat.git",
+      "revision": "4d692ecf58fc1c8611baeb94a31d04c0501b3452",
+      "link_mode": "local-only"
+    }
+  },
+  "components": [
+    {
+      "id": "persona",
+      "type": "external",
+      "icon": "person",
+      "label": "Usuario de iOS",
+      "sublabel": "Seguimiento de hábitos",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "sources": [
+        {
+          "path": "AGENTS.md",
+          "line": 12,
+          "end_line": 13
+        }
+      ]
+    },
+    {
+      "id": "interfaz",
+      "type": "frontend",
+      "label": "1 · App para iPhone",
+      "sublabel": "Hoy, fichas e informes",
+      "pos": [
+        310,
+        40
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ios/Repeat/Views.swift",
+          "line": 3,
+          "end_line": 35
+        },
+        {
+          "path": "ios/Repeat/RepeatApp.swift",
+          "line": 4,
+          "end_line": 10
+        }
+      ]
+    },
+    {
+      "id": "motor",
+      "type": "backend",
+      "label": "2 · Motor de hábitos",
+      "sublabel": "Registros, metas y tiempo",
+      "pos": [
+        610,
+        40
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ios/Repeat/Store.swift",
+          "line": 43,
+          "end_line": 84
+        },
+        {
+          "path": "ios/Repeat/Store.swift",
+          "line": 124,
+          "end_line": 151
+        },
+        {
+          "path": "ios/Repeat/Store.swift",
+          "line": 153,
+          "end_line": 187
+        }
+      ]
+    },
+    {
+      "id": "estado",
+      "type": "database",
+      "label": "3 · Guardado local",
+      "sublabel": "Estado y cola en un JSON",
+      "pos": [
+        610,
+        250
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ios/Repeat/Store.swift",
+          "line": 30,
+          "end_line": 45
+        },
+        {
+          "path": "ios/Repeat/Persistence.swift",
+          "line": 3,
+          "end_line": 10
+        },
+        {
+          "path": "ios/Repeat/Store.swift",
+          "line": 68,
+          "end_line": 73
+        }
+      ]
+    },
+    {
+      "id": "sincronizacion",
+      "type": "backend",
+      "label": "4 · Sincronización",
+      "sublabel": "Solo con cuenta conectada",
+      "pos": [
+        610,
+        460
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ios/Repeat/Store.swift",
+          "line": 91,
+          "end_line": 122
+        },
+        {
+          "path": "ios/Repeat/Views.swift",
+          "line": 35,
+          "end_line": 36
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "5 · API de Repeat",
+      "sublabel": "GET / POST /api/state",
+      "pos": [
+        970,
+        460
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "app/api/state/route.ts",
+          "line": 7,
+          "end_line": 36
+        },
+        {
+          "path": "app/api/state/route.ts",
+          "line": 40,
+          "end_line": 64
+        }
+      ]
+    },
+    {
+      "id": "d1",
+      "type": "database",
+      "label": "6 · Cloudflare D1",
+      "sublabel": "Datos separados por usuario",
+      "pos": [
+        970,
+        680
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "db/schema.ts",
+          "line": 1,
+          "end_line": 6
+        },
+        {
+          "path": "app/api/state/route.ts",
+          "line": 7,
+          "end_line": 18
+        },
+        {
+          "path": "app/api/state/route.ts",
+          "line": 53,
+          "end_line": 64
+        }
+      ]
+    },
+    {
+      "id": "salud",
+      "type": "database",
+      "label": "Salud en Repeat",
+      "sublabel": "Lecturas y correcciones locales",
+      "pos": [
+        310,
+        250
+      ],
+      "size": [
+        195,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ios/Repeat/Store.swift",
+          "line": 153,
+          "end_line": 187
+        },
+        {
+          "path": "ios/Repeat/NativeStorage.swift",
+          "line": 32,
+          "end_line": 47
+        },
+        {
+          "path": "ios/Repeat/HealthIntegration.swift",
+          "line": 21,
+          "end_line": 55
+        }
+      ]
+    },
+    {
+      "id": "healthkit",
+      "type": "external",
+      "label": "Apple Health",
+      "sublabel": "Servicio de iOS / HealthKit",
+      "pos": [
+        40,
+        250
+      ],
+      "size": [
+        170,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ios/Repeat/HealthIntegration.swift",
+          "line": 21,
+          "end_line": 55
+        }
+      ]
+    },
+    {
+      "id": "widgets",
+      "type": "frontend",
+      "label": "Widgets de iOS",
+      "sublabel": "Resumen local en App Group",
+      "pos": [
+        310,
+        460
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "ios/Repeat/NativeStorage.swift",
+          "line": 19,
+          "end_line": 30
+        },
+        {
+          "path": "ios/RepeatWidgets/Widgets.swift",
+          "line": 6,
+          "end_line": 14
+        },
+        {
+          "path": "ios/Repeat/Store.swift",
+          "line": 143,
+          "end_line": 151
+        }
+      ]
+    },
+    {
+      "id": "identidad",
+      "type": "security",
+      "label": "Identidad de Sites",
+      "sublabel": "Sesión de ChatGPT requerida",
+      "pos": [
+        970,
+        250
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "sources": [
+        {
+          "path": "app/chatgpt-auth.ts",
+          "line": 11,
+          "end_line": 39
+        },
+        {
+          "path": "app/api/state/route.ts",
+          "line": 16,
+          "end_line": 25
+        },
+        {
+          "path": "ios/Repeat/ConnectionView.swift",
+          "line": 4,
+          "end_line": 24
+        }
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Cliente del computador",
+      "sublabel": "React en el navegador",
+      "pos": [
+        970,
+        40
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "sources": [
+        {
+          "path": "components/repeat.tsx",
+          "line": 15,
+          "end_line": 23
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "iPhone · Repeat y almacenamiento local",
+      "wraps": [
+        "interfaz",
+        "motor",
+        "estado",
+        "sincronizacion",
+        "salud",
+        "widgets"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "region",
+      "label": "Servicios alojados · Sites / Cloudflare",
+      "wraps": [
+        "identidad",
+        "api",
+        "d1"
+      ],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "id": "usar",
+      "from": "persona",
+      "to": "interfaz",
+      "label": "Registra",
+      "variant": "emphasis"
+    },
+    {
+      "id": "cambiar",
+      "from": "interfaz",
+      "to": "motor",
+      "label": "Cambia hábito",
+      "variant": "emphasis"
+    },
+    {
+      "id": "guardar",
+      "from": "motor",
+      "to": "estado",
+      "label": "Guarda primero",
+      "variant": "emphasis"
+    },
+    {
+      "id": "enviar",
+      "from": "motor",
+      "to": "sincronizacion",
+      "label": "Si conectado",
+      "variant": "dashed"
+    },
+    {
+      "id": "https",
+      "from": "sincronizacion",
+      "to": "api",
+      "label": "HTTPS + sesión",
+      "variant": "emphasis"
+    },
+    {
+      "id": "persistir",
+      "from": "api",
+      "to": "d1",
+      "label": "Lee / guarda",
+      "variant": "emphasis"
+    },
+    {
+      "id": "lectura-salud",
+      "from": "healthkit",
+      "to": "salud",
+      "label": "Lectura autorizada"
+    },
+    {
+      "id": "combinar",
+      "from": "salud",
+      "to": "motor",
+      "label": "Combina localmente"
+    },
+    {
+      "id": "resumen",
+      "from": "motor",
+      "to": "widgets",
+      "label": "Publica resumen"
+    },
+    {
+      "id": "autorizar",
+      "from": "identidad",
+      "to": "api",
+      "label": "Identifica usuario",
+      "variant": "security"
+    },
+    {
+      "id": "web-api",
+      "from": "web",
+      "to": "api",
+      "label": "HTTPS + sesión"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Camino principal",
+      "items": [
+        "1 → 2 → 3: registrar, actualizar y guardar en el iPhone; funciona sin conexión.",
+        "Tras guardar, 2 → 4 → 5 → 6 sincroniza si la cuenta está conectada. La respuesta actualiza la copia local y la interfaz.",
+        "Los números describen el recorrido, no seis servicios independientes: motor y sincronización pertenecen a HabitStore."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Límites y protección de datos",
+      "items": [
+        "El estado y las operaciones pendientes se escriben juntos y de forma atómica; mutate revierte la memoria si falla el guardado.",
+        "Salud requiere permiso de lectura de iOS. Sus valores y correcciones viven en repeat-health-local.json y no se envían a la API.",
+        "Los widgets leen un resumen del App Group; Salud se excluye por defecto. El App Group no contiene la cola de sincronización.",
+        "La API exige identidad y origen válido para escribir, filtra por user_id y evita duplicar incrementos mediante recibos."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Alcance y desconocidos",
+      "items": [
+        "Público objetivo: cualquier persona con iPhone. El despliegue actual sigue siendo privado; el diagrama no implica acceso público.",
+        "El cliente web es una entrada adicional a la misma API; se muestra fuera del servidor porque se ejecuta en el navegador.",
+        "No verificados: sesión y disponibilidad actuales en producción, región de D1 y políticas operativas de copias de seguridad.",
+        "Se agrupan temporizadores, métricas e informes en el motor; los recordatorios usan permisos y servicios locales de iOS.",
+        "Fuentes: código de Repeat en el commit 4d692ecf58fc. Las referencias de archivo y línea están disponibles en los componentes."
+      ]
+    }
+  ]
+}
