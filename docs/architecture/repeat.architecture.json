@@ -2,13 +2,13 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "Repeat · arquitectura de alto nivel",
+    "title": "Repeat · datos personales e iCloud opcional",
     "locale": "es",
     "output": "docs/architecture/repeat.html",
     "quality_profile": "showcase",
     "repository": {
       "url": "git@github.com:adrianrrruiz/Repeat.git",
-      "revision": "4d692ecf58fc1c8611baeb94a31d04c0501b3452",
+      "revision": "2ff18f6fa4e1c1a5e7e1311a91d8b1af9dd9ca42",
       "link_mode": "local-only"
     }
   },
@@ -21,7 +21,7 @@
       "sublabel": "Seguimiento de hábitos",
       "pos": [
         40,
-        40
+        250
       ],
       "size": [
         160,
@@ -42,7 +42,7 @@
       "sublabel": "Hoy, fichas e informes",
       "pos": [
         310,
-        40
+        250
       ],
       "size": [
         180,
@@ -68,7 +68,7 @@
       "sublabel": "Registros, metas y tiempo",
       "pos": [
         610,
-        40
+        250
       ],
       "size": [
         180,
@@ -77,18 +77,18 @@
       "sources": [
         {
           "path": "ios/Repeat/Store.swift",
-          "line": 43,
-          "end_line": 84
+          "line": 41,
+          "end_line": 55
         },
         {
           "path": "ios/Repeat/Store.swift",
-          "line": 124,
+          "line": 91,
+          "end_line": 111
+        },
+        {
+          "path": "ios/Repeat/Store.swift",
+          "line": 132,
           "end_line": 151
-        },
-        {
-          "path": "ios/Repeat/Store.swift",
-          "line": 153,
-          "end_line": 187
         }
       ]
     },
@@ -99,7 +99,7 @@
       "sublabel": "Estado y cola en un JSON",
       "pos": [
         610,
-        250
+        40
       ],
       "size": [
         180,
@@ -108,8 +108,8 @@
       "sources": [
         {
           "path": "ios/Repeat/Store.swift",
-          "line": 30,
-          "end_line": 45
+          "line": 27,
+          "end_line": 49
         },
         {
           "path": "ios/Repeat/Persistence.swift",
@@ -117,17 +117,17 @@
           "end_line": 10
         },
         {
-          "path": "ios/Repeat/Store.swift",
-          "line": 68,
-          "end_line": 73
+          "path": "ios/Repeat/Models.swift",
+          "line": 117,
+          "end_line": 133
         }
       ]
     },
     {
       "id": "sincronizacion",
       "type": "backend",
-      "label": "4 · Sincronización",
-      "sublabel": "Solo con cuenta conectada",
+      "label": "4 · iCloud opcional",
+      "sublabel": "Preparado · no activo hoy",
       "pos": [
         610,
         460
@@ -138,71 +138,19 @@
       ],
       "sources": [
         {
+          "path": "ios/Repeat/CloudSync.swift",
+          "line": 20,
+          "end_line": 103
+        },
+        {
+          "path": "ios/Repeat/CloudReplica.swift",
+          "line": 5,
+          "end_line": 34
+        },
+        {
           "path": "ios/Repeat/Store.swift",
-          "line": 91,
-          "end_line": 122
-        },
-        {
-          "path": "ios/Repeat/Views.swift",
-          "line": 35,
-          "end_line": 36
-        }
-      ]
-    },
-    {
-      "id": "api",
-      "type": "backend",
-      "label": "5 · API de Repeat",
-      "sublabel": "GET / POST /api/state",
-      "pos": [
-        970,
-        460
-      ],
-      "size": [
-        180,
-        64
-      ],
-      "sources": [
-        {
-          "path": "app/api/state/route.ts",
-          "line": 7,
-          "end_line": 36
-        },
-        {
-          "path": "app/api/state/route.ts",
-          "line": 40,
-          "end_line": 64
-        }
-      ]
-    },
-    {
-      "id": "d1",
-      "type": "database",
-      "label": "6 · Cloudflare D1",
-      "sublabel": "Datos separados por usuario",
-      "pos": [
-        970,
-        680
-      ],
-      "size": [
-        180,
-        64
-      ],
-      "sources": [
-        {
-          "path": "db/schema.ts",
-          "line": 1,
-          "end_line": 6
-        },
-        {
-          "path": "app/api/state/route.ts",
-          "line": 7,
-          "end_line": 18
-        },
-        {
-          "path": "app/api/state/route.ts",
-          "line": 53,
-          "end_line": 64
+          "line": 69,
+          "end_line": 111
         }
       ]
     },
@@ -213,7 +161,7 @@
       "sublabel": "Lecturas y correcciones locales",
       "pos": [
         310,
-        250
+        680
       ],
       "size": [
         195,
@@ -222,8 +170,8 @@
       "sources": [
         {
           "path": "ios/Repeat/Store.swift",
-          "line": 153,
-          "end_line": 187
+          "line": 142,
+          "end_line": 151
         },
         {
           "path": "ios/Repeat/NativeStorage.swift",
@@ -244,7 +192,7 @@
       "sublabel": "Servicio de iOS / HealthKit",
       "pos": [
         40,
-        250
+        680
       ],
       "size": [
         170,
@@ -284,60 +232,60 @@
         },
         {
           "path": "ios/Repeat/Store.swift",
-          "line": 143,
-          "end_line": 151
+          "line": 132,
+          "end_line": 140
         }
       ]
     },
     {
-      "id": "identidad",
-      "type": "security",
-      "label": "Identidad de Sites",
-      "sublabel": "Sesión de ChatGPT requerida",
+      "id": "icloud",
+      "type": "cloud",
+      "label": "5 · Tu iCloud privado",
+      "sublabel": "CloudKit · contenido cifrado",
       "pos": [
         970,
-        250
+        460
       ],
       "size": [
-        180,
+        185,
         64
       ],
       "sources": [
         {
-          "path": "app/chatgpt-auth.ts",
-          "line": 11,
-          "end_line": 39
+          "path": "ios/Repeat/CloudSync.swift",
+          "line": 34,
+          "end_line": 40
         },
         {
-          "path": "app/api/state/route.ts",
-          "line": 16,
-          "end_line": 25
+          "path": "ios/Repeat/CloudSync.swift",
+          "line": 49,
+          "end_line": 98
         },
         {
-          "path": "ios/Repeat/ConnectionView.swift",
-          "line": 4,
-          "end_line": 24
+          "path": "ios/Repeat/CloudSync.swift",
+          "line": 105,
+          "end_line": 109
         }
       ]
     },
     {
-      "id": "web",
+      "id": "copias",
       "type": "frontend",
-      "label": "Cliente del computador",
-      "sublabel": "React en el navegador",
+      "label": "Copias manuales",
+      "sublabel": "Exportar JSON / CSV y restaurar",
       "pos": [
-        970,
+        310,
         40
       ],
       "size": [
-        190,
+        200,
         64
       ],
       "sources": [
         {
-          "path": "components/repeat.tsx",
-          "line": 15,
-          "end_line": 23
+          "path": "ios/Repeat/PersonalFeatures.swift",
+          "line": 31,
+          "end_line": 55
         }
       ]
     }
@@ -345,24 +293,23 @@
   "boundaries": [
     {
       "kind": "region",
-      "label": "iPhone · Repeat y almacenamiento local",
+      "label": "iPhone · app y datos locales",
       "wraps": [
         "interfaz",
         "motor",
         "estado",
         "sincronizacion",
         "salud",
-        "widgets"
+        "widgets",
+        "copias"
       ],
       "pad": 24
     },
     {
       "kind": "region",
-      "label": "Servicios alojados · Sites / Cloudflare",
+      "label": "Cuenta privada de Apple del usuario",
       "wraps": [
-        "identidad",
-        "api",
-        "d1"
+        "icloud"
       ],
       "pad": 24
     }
@@ -393,22 +340,15 @@
       "id": "enviar",
       "from": "motor",
       "to": "sincronizacion",
-      "label": "Si conectado",
+      "label": "Permiso + firma válida",
       "variant": "dashed"
     },
     {
-      "id": "https",
+      "id": "privada",
       "from": "sincronizacion",
-      "to": "api",
-      "label": "HTTPS + sesión",
-      "variant": "emphasis"
-    },
-    {
-      "id": "persistir",
-      "from": "api",
-      "to": "d1",
-      "label": "Lee / guarda",
-      "variant": "emphasis"
+      "to": "icloud",
+      "label": "Copia cifrada opcional",
+      "variant": "dashed"
     },
     {
       "id": "lectura-salud",
@@ -429,48 +369,41 @@
       "label": "Publica resumen"
     },
     {
-      "id": "autorizar",
-      "from": "identidad",
-      "to": "api",
-      "label": "Identifica usuario",
-      "variant": "security"
-    },
-    {
-      "id": "web-api",
-      "from": "web",
-      "to": "api",
-      "label": "HTTPS + sesión"
+      "id": "portabilidad",
+      "from": "motor",
+      "to": "copias",
+      "label": "Datos manuales"
     }
   ],
   "cards": [
     {
-      "dot": "cyan",
-      "title": "Camino principal",
+      "dot": "amber",
+      "title": "Estado actual de la instalación",
       "items": [
-        "1 → 2 → 3: registrar, actualizar y guardar en el iPhone; funciona sin conexión.",
-        "Tras guardar, 2 → 4 → 5 → 6 sincroniza si la cuenta está conectada. La respuesta actualiza la copia local y la interfaz.",
-        "Los números describen el recorrido, no seis servicios independientes: motor y sincronización pertenecen a HabitStore."
+        "Repeat 1.7 funciona en modo local. La firma gratuita de Apple impide activar iCloud; no hay subida ni recuperación reales verificadas.",
+        "El código privado está preparado, pero requiere firma compatible, contenedor y esquema CloudKit. La rama de nube solo opera después de esa habilitación y del consentimiento de la persona.",
+        "La app nativa retiró la conexión a Sites / OpenAI / Cloudflare. La web anterior queda separada y sus datos no se borraron."
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Camino principal y recuperación",
+      "items": [
+        "1 → 2 → 3: registra un hábito y persiste primero en el iPhone, con estado y operaciones pendientes juntos.",
+        "2 → 4 → 5: opcional y condicionado. La cuenta de Apple autentica a la persona; el contenido usa campos cifrados de su base privada, sin servidor de Repeat.",
+        "Cuando se habilite: conserva recibos para reintentos, comprueba la versión y solo confirma la copia tras guardar también el resultado local. Sin red, conserva cambios pendientes.",
+        "Sincronizar permite recuperar lo que ya llegó a iCloud; no es un historial de respaldos y también propaga borrados."
       ]
     },
     {
       "dot": "emerald",
-      "title": "Límites y protección de datos",
+      "title": "Control y límites de privacidad",
       "items": [
-        "El estado y las operaciones pendientes se escriben juntos y de forma atómica; mutate revierte la memoria si falla el guardado.",
-        "Salud requiere permiso de lectura de iOS. Sus valores y correcciones viven en repeat-health-local.json y no se envían a la API.",
-        "Los widgets leen un resumen del App Group; Salud se excluye por defecto. El App Group no contiene la cola de sincronización.",
-        "La API exige identidad y origen válido para escribir, filtra por user_id y evita duplicar incrementos mediante recibos."
-      ]
-    },
-    {
-      "dot": "amber",
-      "title": "Alcance y desconocidos",
-      "items": [
-        "Público objetivo: cualquier persona con iPhone. El despliegue actual sigue siendo privado; el diagrama no implica acceso público.",
-        "El cliente web es una entrada adicional a la misma API; se muestra fuera del servidor porque se ejecuta en el navegador.",
-        "No verificados: sesión y disponibilidad actuales en producción, región de D1 y políticas operativas de copias de seguridad.",
-        "Se agrupan temporizadores, métricas e informes en el motor; los recordatorios usan permisos y servicios locales de iOS.",
-        "Fuentes: código de Repeat en el commit 4d692ecf58fc. Las referencias de archivo y línea están disponibles en los componentes."
+        "La persona puede desactivar iCloud, exportar/importar sus hábitos y confirmar el borrado de su copia privada conservando los datos locales.",
+        "Lecturas y correcciones de Apple Health permanecen en el iPhone. No entran en el payload de iCloud ni en las copias JSON/CSV normales.",
+        "Los widgets usan un resumen local; Salud se excluye de ellos por defecto. Las notas y la cola no se guardan en App Group.",
+        "No verificados: operaciones reales contra CloudKit, recuperación en otro teléfono y comportamiento entre dispositivos. Mac, Windows y análisis web quedan para después.",
+        "La primera activación combina datos y conserva valores locales coincidentes; un cambio de cuenta o copia eliminada detiene la sincronización."
       ]
     }
   ]
